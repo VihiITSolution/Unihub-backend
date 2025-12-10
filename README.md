@@ -53,6 +53,27 @@ A comprehensive Node.js/Express backend API for the UniHub E-Learning Platform w
   - Revenue tracking
   - User analytics
 
+### Security Features
+- **Authentication & Authorization**
+  - JWT token-based authentication
+  - Bcrypt password hashing (12 rounds)
+  - Role-based access control
+  - Algorithm-specific JWT verification
+  
+- **Rate Limiting**
+  - General API rate limiting (100 requests per 15 minutes)
+  - Strict authentication rate limiting (5 attempts per 15 minutes)
+  - Resource creation rate limiting (20 requests per 15 minutes)
+  
+- **Security Headers**
+  - Helmet.js for secure HTTP headers
+  - CORS configuration
+  - Input validation and sanitization
+- **Analytics & Reporting**
+  - Platform statistics
+  - Revenue tracking
+  - User analytics
+
 ## 📋 Prerequisites
 
 - Node.js (v14 or higher)
@@ -234,10 +255,11 @@ After running `npm run seed`, the following test accounts are available:
 - **ORM:** Sequelize
 - **Database:** MySQL
 - **Authentication:** JWT (jsonwebtoken)
-- **Password Hashing:** bcryptjs
+- **Password Hashing:** bcryptjs (12 rounds)
 - **Validation:** express-validator
 - **API Documentation:** Swagger (swagger-jsdoc, swagger-ui-express)
-- **Security:** Helmet, CORS
+- **Security:** Helmet, CORS, express-rate-limit
+- **Unique IDs:** UUID
 - **Environment Variables:** dotenv
 
 ## 📁 Project Structure
@@ -259,6 +281,7 @@ Unihub-backend/
 │   ├── middleware/
 │   │   ├── auth.js           # Authentication & authorization
 │   │   ├── errorHandler.js   # Global error handler
+│   │   ├── rateLimiter.js    # Rate limiting middleware
 │   │   └── validate.js       # Validation middleware
 │   ├── migrations/
 │   │   ├── migrate.js        # Database migration script
