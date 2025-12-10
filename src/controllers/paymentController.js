@@ -1,4 +1,5 @@
 const { Payment, Enrollment, Course, MarketplaceItem } = require('../models');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * Create a payment
@@ -51,7 +52,7 @@ const createPayment = async (req, res, next) => {
       actualAmount = item.price;
     }
 
-    const transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+    const transactionId = `TXN-${uuidv4()}`;
 
     const payment = await Payment.create({
       userId: req.user.id,
