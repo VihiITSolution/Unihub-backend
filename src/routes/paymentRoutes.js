@@ -6,6 +6,7 @@ const {
   getPaymentById 
 } = require('../controllers/paymentController');
 const { authMiddleware } = require('../middleware/auth');
+const { createLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
 const router = express.Router();
@@ -40,6 +41,7 @@ const router = express.Router();
 router.post(
   '/',
   authMiddleware,
+  createLimiter,
   [
     body('paymentMethod').optional().trim(),
     validate

@@ -7,6 +7,7 @@ const {
   cancelEnrollment 
 } = require('../controllers/enrollmentController');
 const { authMiddleware, authorize } = require('../middleware/auth');
+const { createLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
 const router = express.Router();
@@ -38,6 +39,7 @@ router.post(
   '/',
   authMiddleware,
   authorize('learner', 'admin'),
+  createLimiter,
   [
     body('courseId').isInt().withMessage('Valid course ID is required'),
     validate

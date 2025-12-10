@@ -9,6 +9,7 @@ const {
   getMyListings 
 } = require('../controllers/marketplaceController');
 const { authMiddleware } = require('../middleware/auth');
+const { createLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
 const router = express.Router();
@@ -63,6 +64,7 @@ const router = express.Router();
 router.post(
   '/',
   authMiddleware,
+  createLimiter,
   [
     body('title').trim().notEmpty().withMessage('Title is required'),
     body('description').trim().notEmpty().withMessage('Description is required'),

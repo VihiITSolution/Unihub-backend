@@ -9,6 +9,7 @@ const {
   getMyCourses 
 } = require('../controllers/courseController');
 const { authMiddleware, authorize } = require('../middleware/auth');
+const { createLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
 const router = express.Router();
@@ -59,6 +60,7 @@ router.post(
   '/',
   authMiddleware,
   authorize('tutor', 'admin'),
+  createLimiter,
   [
     body('title').trim().notEmpty().withMessage('Title is required'),
     body('description').trim().notEmpty().withMessage('Description is required'),

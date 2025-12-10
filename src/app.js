@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const errorHandler = require('./middleware/errorHandler');
+const { apiLimiter } = require('./middleware/rateLimiter');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -27,6 +28,9 @@ app.use(cors({
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply rate limiting to all API routes
+app.use('/api', apiLimiter);
 
 // Health check endpoint
 app.get('/', (req, res) => {
