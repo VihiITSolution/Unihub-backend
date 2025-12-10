@@ -1,0 +1,188 @@
+const express = require('express');
+const { body } = require('express-validator');
+const { 
+  createListing, 
+  getListings, 
+  getListingById, 
+  updateListing, 
+  deleteListing, 
+  getMyListings 
+} = require('../controllers/marketplaceController');
+const { authMiddleware } = require('../middleware/auth');
+const { createLimiter } = require('../middleware/rateLimiter');
+const validate = require('../middleware/validate');
+
+const router = express.Router();
+
+/**
+ * @swagger
+ * /api/marketplace:
+ *   post:
+ *     tags: [Marketplace]
+ *     summary: Create marketplace listing
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *               - category
+ *               - itemType
+ *               - price
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *               itemType:
+ *                 type: string
+ *                 enum: [book, notes, equipment, electronics, other]
+ *               condition:
+ *                 type: string
+ *                 enum: [new, like_new, good, fair, poor]
+ *               price:
+ *                 type: number
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               location:
+ *                 type: string
+ *               contactInfo:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Listing created successfully
+ */
+router.post(
+  '/',
+  authMiddleware,
+  createLimiter,
+  [
+    body('title').trim().notEmpty().withMessage('Title is required'),
+    body('description').trim().notEmpty().withMessage('Description is required'),
+    body('category').trim().notEmpty().withMessage('Category is required'),
+    body('itemType').isIn(['book', 'notes', 'equipment', 'electronics', 'other']).withMessage('Invalid item type'),
+    body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
+    validate
+  ],
+  createListing
+);
+
+/**
+ * @swagger
+ * /api/marketplace:
+ *   get:
+ *     tags: [Marketplace]
+ *     summary: Get all marketplace listings
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: itemType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: condition
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of marketplace items
+ */
+router.get('/', getListings);
+
+/**
+ * @swagger
+ * /api/marketplace/my-listings:
+ *   get:
+ *     tags: [Marketplace]
+ *     summary: Get my listings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of user's listings
+ */
+router.get('/my-listings', authMiddleware, getMyListings);
+
+/**
+ * @swagger
+ * /api/marketplace/{id}:
+ *   get:
+ *     tags: [Marketplace]
+ *     summary: Get listing by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Listing details
+ */
+router.get('/:id', getListingById);
+
+/**
+ * @swagger
+ * /api/marketplace/{id}:
+ *   put:
+ *     tags: [Marketplace]
+ *     summary: Update listing
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Listing updated successfully
+ */
+router.put('/:id', authMiddleware, updateListing);
+
+/**
+ * @swagger
+ * /api/marketplace/{id}:
+ *   delete:
+ *     tags: [Marketplace]
+ *     summary: Delete listing
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Listing deleted successfully
+ */
+router.delete('/:id', authMiddleware, deleteListing);
+
+module.exports = router;
