@@ -63,8 +63,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/admin', adminRoutes);
 
-// 404 handler
-app.use('*', (req, res) => {
+// 404 handler - Express 5.x compatible
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found'
