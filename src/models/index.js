@@ -4,6 +4,19 @@ const Course = require('./Course');
 const Enrollment = require('./Enrollment');
 const Payment = require('./Payment');
 const MarketplaceItem = require('./MarketplaceItem');
+const StudentProfile = require('./StudentProfile');
+const TutorProfile = require('./TutorProfile');
+
+// User - Profile relationships
+User.hasOne(StudentProfile, { foreignKey: 'userId', as: 'studentProfile' });
+StudentProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasOne(TutorProfile, { foreignKey: 'userId', as: 'tutorProfile' });
+TutorProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// TutorProfile - Admin approval relationship
+User.hasMany(TutorProfile, { foreignKey: 'approvedBy', as: 'approvedTutors' });
+TutorProfile.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver' });
 
 // User - Course relationship (Tutor creates courses)
 User.hasMany(Course, { foreignKey: 'tutorId', as: 'courses' });
@@ -39,5 +52,8 @@ module.exports = {
   Course,
   Enrollment,
   Payment,
-  MarketplaceItem
+  MarketplaceItem,
+  StudentProfile,
+  TutorProfile
 };
+

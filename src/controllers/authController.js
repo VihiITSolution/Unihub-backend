@@ -1,12 +1,22 @@
-const { User } = require('../models');
+const { User, StudentProfile, TutorProfile } = require('../models');
 const { generateToken } = require('../utils/token');
 
 /**
- * Register a new user
+ * Register a new user with optional student profile
  */
 const register = async (req, res, next) => {
   try {
-    const { firstName, lastName, email, password, role, phoneNumber } = req.body;
+    const { 
+      firstName, 
+      lastName, 
+      email, 
+      password, 
+      roles,
+      primaryRole,
+      phoneNumber,
+      // Student profile fields
+      studentProfile
+    } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
@@ -16,22 +26,54 @@ const register = async (req, res, next) => {
       });
     }
 
+    // Determine roles - default to student if not provided
+    const userRoles = roles && roles.length > 0 ? roles : ['student'];
+    const userPrimaryRole = primaryRole || userRoles[0];
+
     const user = await User.create({
       firstName,
       lastName,
       email,
       password,
-      role: role || 'learner',
+      roles: userRoles,
+      primaryRole: userPrimaryRole,
       phoneNumber
     });
 
+    // If registering as student with profile data, create student profile
+    if (userRoles.includes('student') && studentProfile) {
+      await StudentProfile.create({
+        userId: user.id,
+        universityName: studentProfile.universityName,
+        department: studentProfile.department,
+        degreeOrCourse: studentProfile.degreeOrCourse,
+        studyingArea: studentProfile.studyingArea,
+        currentYear: studentProfile.currentYear,
+        currentSemester: studentProfile.currentSemester,
+        studentIdNumber: studentProfile.studentIdNumber,
+        currentAddress: studentProfile.currentAddress,
+        phoneNumber: studentProfile.phoneNumber || phoneNumber,
+        dateOfBirth: studentProfile.dateOfBirth,
+        isProfileComplete: true
+      });
+      user.isStudentProfileComplete = true;
+      await user.save();
+    }
+
     const token = generateToken(user.id);
+
+    // Reload user with profile
+    const userWithProfile = await User.findByPk(user.id, {
+      include: [
+        { model: StudentProfile, as: 'studentProfile' }
+      ]
+    });
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
-        user,
+        user: userWithProfile,
         token
       }
     });
@@ -47,7 +89,14 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ 
+      where: { email },
+      include: [
+        { model: StudentProfile, as: 'studentProfile' },
+        { model: TutorProfile, as: 'tutorProfile' }
+      ]
+    });
+
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -89,11 +138,16 @@ const login = async (req, res, next) => {
 };
 
 /**
- * Get current user profile
+ * Get current user profile with all role-specific profiles
  */
 const getProfile = async (req, res, next) => {
   try {
-    const user = await User.findByPk(req.user.id);
+    const user = await User.findByPk(req.user.id, {
+      include: [
+        { model: StudentProfile, as: 'studentProfile' },
+        { model: TutorProfile, as: 'tutorProfile' }
+      ]
+    });
     
     res.status(200).json({
       success: true,
@@ -136,3 +190,4 @@ module.exports = {
   getProfile,
   updateProfile
 };
+

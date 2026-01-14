@@ -30,10 +30,19 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(255),
     allowNull: false
   },
-  role: {
-    type: DataTypes.ENUM('learner', 'tutor', 'admin'),
+  // Multi-role support: JSON array of roles
+  roles: {
+    type: DataTypes.JSON,
     allowNull: false,
-    defaultValue: 'learner'
+    defaultValue: ['student'],
+    comment: 'Array of roles: student, tutor, admin'
+  },
+  // Primary role for dashboard routing
+  primaryRole: {
+    type: DataTypes.ENUM('student', 'tutor', 'vendor', 'admin'),
+    allowNull: false,
+    defaultValue: 'student',
+    field: 'primary_role'
   },
   phoneNumber: {
     type: DataTypes.STRING(20),
@@ -55,6 +64,17 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
     field: 'is_active'
+  },
+  // Profile completion status
+  isStudentProfileComplete: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_student_profile_complete'
+  },
+  isTutorProfileComplete: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_tutor_profile_complete'
   },
   lastLogin: {
     type: DataTypes.DATE,
@@ -82,6 +102,18 @@ User.prototype.validatePassword = async function(password) {
   return await bcrypt.compare(password, this.password);
 };
 
+// Check if user has a specific role
+User.prototype.hasRole = function(role) {
+  return this.roles && this.roles.includes(role);
+};
+
+// Add a role to user
+User.prototype.addRole = function(role) {
+  if (!this.roles.includes(role)) {
+    this.roles = [...this.roles, role];
+  }
+};
+
 User.prototype.toJSON = function() {
   const values = Object.assign({}, this.get());
   delete values.password;
@@ -89,3 +121,4 @@ User.prototype.toJSON = function() {
 };
 
 module.exports = User;
+
