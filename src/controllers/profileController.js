@@ -1,0 +1,306 @@
+const { User, StudentProfile, TutorProfile } = require('../models');
+
+/**
+ * Get student profile for current user
+ */
+const getStudentProfile = async (req, res, next) => {
+  try {
+    const profile = await StudentProfile.findOne({
+      where: { userId: req.user.id }
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student profile not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { profile }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Create or update student profile
+ */
+const upsertStudentProfile = async (req, res, next) => {
+  try {
+    const {
+      universityName,
+      department,
+      degreeOrCourse,
+      studyingArea,
+      currentYear,
+      currentSemester,
+      studentIdNumber,
+      currentAddress,
+      phoneNumber,
+      dateOfBirth
+    } = req.body;
+
+    let profile = await StudentProfile.findOne({
+      where: { userId: req.user.id }
+    });
+
+    if (profile) {
+      // Update existing profile
+      await profile.update({
+        universityName,
+        department,
+        degreeOrCourse,
+        studyingArea,
+        currentYear,
+        currentSemester,
+        studentIdNumber,
+        currentAddress,
+        phoneNumber,
+        dateOfBirth,
+        isProfileComplete: true
+      });
+    } else {
+      // Create new profile
+      profile = await StudentProfile.create({
+        userId: req.user.id,
+        universityName,
+        department,
+        degreeOrCourse,
+        studyingArea,
+        currentYear,
+        currentSemester,
+        studentIdNumber,
+        currentAddress,
+        phoneNumber,
+        dateOfBirth,
+        isProfileComplete: true
+      });
+    }
+
+    // Update user's profile completion status
+    const user = await User.findByPk(req.user.id);
+    user.isStudentProfileComplete = true;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Student profile saved successfully',
+      data: { profile }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get tutor profile for current user
+ */
+const getTutorProfile = async (req, res, next) => {
+  try {
+    const profile = await TutorProfile.findOne({
+      where: { userId: req.user.id }
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tutor profile not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { profile }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Apply to become a tutor (create tutor profile with pending status)
+ */
+const applyAsTutor = async (req, res, next) => {
+  try {
+    const {
+      qualifications,
+      expertiseAreas,
+      bio,
+      yearsOfExperience
+    } = req.body;
+
+    // Check if user already has a tutor profile
+    const existingProfile = await TutorProfile.findOne({
+      where: { userId: req.user.id }
+    });
+
+    if (existingProfile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tutor application already exists',
+        data: { applicationStatus: existingProfile.approvalStatus }
+      });
+    }
+
+    // Create tutor profile with pending status
+    const profile = await TutorProfile.create({
+      userId: req.user.id,
+      qualifications,
+      expertiseAreas: expertiseAreas || [],
+      bio,
+      yearsOfExperience: yearsOfExperience || 0,
+      isApproved: false,
+      approvalStatus: 'pending',
+      isProfileComplete: true
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Tutor application submitted successfully. Awaiting admin approval.',
+      data: { profile }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update tutor profile
+ */
+const updateTutorProfile = async (req, res, next) => {
+  try {
+    const profile = await TutorProfile.findOne({
+      where: { userId: req.user.id }
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tutor profile not found'
+      });
+    }
+
+    const {
+      qualifications,
+      expertiseAreas,
+      bio,
+      yearsOfExperience
+    } = req.body;
+
+    await profile.update({
+      qualifications: qualifications || profile.qualifications,
+      expertiseAreas: expertiseAreas || profile.expertiseAreas,
+      bio: bio || profile.bio,
+      yearsOfExperience: yearsOfExperience ?? profile.yearsOfExperience
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Tutor profile updated successfully',
+      data: { profile }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Admin: Get all pending tutor applications
+ */
+const getPendingTutorApplications = async (req, res, next) => {
+  try {
+    const applications = await TutorProfile.findAll({
+      where: { approvalStatus: 'pending' },
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'firstName', 'lastName', 'email', 'profileImage']
+      }]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { applications }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Admin: Approve or reject tutor application
+ */
+const reviewTutorApplication = async (req, res, next) => {
+  try {
+    const { tutorProfileId } = req.params;
+    const { action, rejectionReason } = req.body;
+
+    const profile = await TutorProfile.findByPk(tutorProfileId, {
+      include: [{ model: User, as: 'user' }]
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tutor profile not found'
+      });
+    }
+
+    if (action === 'approve') {
+      await profile.update({
+        isApproved: true,
+        approvalStatus: 'approved',
+        approvedBy: req.user.id,
+        approvedAt: new Date()
+      });
+
+      // Add tutor role to user if not already present
+      const user = profile.user;
+      if (!user.roles.includes('tutor')) {
+        user.roles = [...user.roles, 'tutor'];
+        user.isTutorProfileComplete = true;
+        await user.save();
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Tutor application approved',
+        data: { profile }
+      });
+    } else if (action === 'reject') {
+      await profile.update({
+        isApproved: false,
+        approvalStatus: 'rejected',
+        approvedBy: req.user.id,
+        approvedAt: new Date(),
+        rejectionReason: rejectionReason || 'Application did not meet requirements'
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Tutor application rejected',
+        data: { profile }
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action. Use "approve" or "reject".'
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  getStudentProfile,
+  upsertStudentProfile,
+  getTutorProfile,
+  applyAsTutor,
+  updateTutorProfile,
+  getPendingTutorApplications,
+  reviewTutorApplication
+};

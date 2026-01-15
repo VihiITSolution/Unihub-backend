@@ -32,7 +32,11 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-const authorize = (...roles) => {
+/**
+ * Authorize middleware for multi-role support
+ * Checks if user has at least one of the required roles
+ */
+const authorize = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ 
@@ -41,7 +45,11 @@ const authorize = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    // Check if user has at least one of the allowed roles
+    const userRoles = req.user.roles || [];
+    const hasRole = allowedRoles.some(role => userRoles.includes(role));
+
+    if (!hasRole) {
       return res.status(403).json({ 
         success: false, 
         message: 'Access forbidden. Insufficient permissions.' 
@@ -52,4 +60,12 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { authMiddleware, authorize };
+/**
+ * Check if user has a specific role (for conditional logic)
+ */
+const hasRole = (user, role) => {
+  return user && user.roles && user.roles.includes(role);
+};
+
+module.exports = { authMiddleware, authorize, hasRole };
+

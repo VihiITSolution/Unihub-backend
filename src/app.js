@@ -8,14 +8,13 @@ const errorHandler = require("./middleware/errorHandler");
 const { apiLimiter } = require("./middleware/rateLimiter");
 
 // Import routes
-const authRoutes = require("./routes/authRoutes");
-const courseRoutes = require("./routes/courseRoutes");
-const courseContentRoutes = require("./routes/courseContentRoutes");
-const enrollmentRoutes = require("./routes/enrollmentRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
-const marketplaceRoutes = require("./routes/marketplaceRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const youtubeRoutes = require("./routes/youtubeRoutes");
+const authRoutes = require('./routes/authRoutes');
+const courseRoutes = require('./routes/courseRoutes');
+const enrollmentRoutes = require('./routes/enrollmentRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+const marketplaceRoutes = require('./routes/marketplaceRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 
 const app = express();
 
@@ -68,17 +67,16 @@ app.use(
 );
 
 // API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/courses", courseRoutes);
-app.use("/api", courseContentRoutes);
-app.use("/api/enrollments", enrollmentRoutes);
-app.use("/api/payments", paymentRoutes);
-app.use("/api/marketplace", marketplaceRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/youtube", youtubeRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/enrollments', enrollmentRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/profiles', profileRoutes);
 
 // 404 handler - Express 5.x compatible
-app.use((req, res, next) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: "Route not found",
