@@ -41,6 +41,13 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Uploaded files
+uploads/
+
+# YouTube API credentials (sensitive)
+src/config/youtube-credentials.json
+src/config/youtube-token.json
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 

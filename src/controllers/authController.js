@@ -22,7 +22,7 @@ const register = async (req, res, next) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Email already registered'
+        message: "Email already registered",
       });
     }
 
@@ -71,7 +71,7 @@ const register = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: "User registered successfully",
       data: {
         user: userWithProfile,
         token
@@ -100,7 +100,7 @@ const login = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
 
@@ -108,14 +108,14 @@ const login = async (req, res, next) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
 
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
-        message: 'Account is deactivated'
+        message: "Account is deactivated",
       });
     }
 
@@ -124,13 +124,19 @@ const login = async (req, res, next) => {
 
     const token = generateToken(user.id);
 
+    // Transform user data to match frontend expectations
+    const userData = user.toJSON();
+    userData.roles = [userData.role === "learner" ? "student" : userData.role];
+    userData.primaryRole =
+      userData.role === "learner" ? "student" : userData.role;
+
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: "Login successful",
       data: {
-        user,
-        token
-      }
+        user: userData,
+        token,
+      },
     });
   } catch (error) {
     next(error);
@@ -151,7 +157,7 @@ const getProfile = async (req, res, next) => {
     
     res.status(200).json({
       success: true,
-      data: { user }
+      data: { user: userData },
     });
   } catch (error) {
     next(error);
@@ -176,8 +182,8 @@ const updateProfile = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully',
-      data: { user }
+      message: "Profile updated successfully",
+      data: { user },
     });
   } catch (error) {
     next(error);
@@ -188,6 +194,6 @@ module.exports = {
   register,
   login,
   getProfile,
-  updateProfile
+  updateProfile,
 };
 

@@ -1,16 +1,17 @@
-const express = require('express');
-const { body } = require('express-validator');
-const { 
-  createCourse, 
-  getCourses, 
-  getCourseById, 
-  updateCourse, 
-  deleteCourse, 
-  getMyCourses 
-} = require('../controllers/courseController');
-const { authMiddleware, authorize } = require('../middleware/auth');
-const { createLimiter } = require('../middleware/rateLimiter');
-const validate = require('../middleware/validate');
+const express = require("express");
+const { body } = require("express-validator");
+const {
+  createCourse,
+  getCourses,
+  getCourseById,
+  updateCourse,
+  deleteCourse,
+  getMyCourses,
+} = require("../controllers/courseController");
+const { authMiddleware, authorize } = require("../middleware/auth");
+const { createLimiter } = require("../middleware/rateLimiter");
+const validate = require("../middleware/validate");
+const { uploadThumbnail } = require("../config/cloudinary");
 
 const router = express.Router();
 
@@ -57,15 +58,21 @@ const router = express.Router();
  *         description: Course created successfully
  */
 router.post(
-  '/',
+  "/",
   authMiddleware,
-  authorize('tutor', 'admin'),
+  authorize("tutor", "admin"),
+  uploadThumbnail,
   createLimiter,
   [
-    body('title').trim().notEmpty().withMessage('Title is required'),
-    body('description').trim().notEmpty().withMessage('Description is required'),
-    body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
-    validate
+    body("title").trim().notEmpty().withMessage("Title is required"),
+    body("description")
+      .trim()
+      .notEmpty()
+      .withMessage("Description is required"),
+    body("price")
+      .isFloat({ min: 0 })
+      .withMessage("Price must be a positive number"),
+    validate,
   ],
   createCourse
 );
@@ -101,7 +108,7 @@ router.post(
  *       200:
  *         description: List of courses
  */
-router.get('/', getCourses);
+router.get("/", getCourses);
 
 /**
  * @swagger
@@ -115,7 +122,12 @@ router.get('/', getCourses);
  *       200:
  *         description: List of tutor's courses
  */
-router.get('/my-courses', authMiddleware, authorize('tutor', 'admin'), getMyCourses);
+router.get(
+  "/my-courses",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  getMyCourses
+);
 
 /**
  * @swagger
@@ -133,7 +145,7 @@ router.get('/my-courses', authMiddleware, authorize('tutor', 'admin'), getMyCour
  *       200:
  *         description: Course details
  */
-router.get('/:id', getCourseById);
+router.get("/:id", getCourseById);
 
 /**
  * @swagger
@@ -153,7 +165,13 @@ router.get('/:id', getCourseById);
  *       200:
  *         description: Course updated successfully
  */
-router.put('/:id', authMiddleware, authorize('tutor', 'admin'), updateCourse);
+router.put(
+  "/:id",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  uploadThumbnail,
+  updateCourse
+);
 
 /**
  * @swagger
@@ -173,6 +191,11 @@ router.put('/:id', authMiddleware, authorize('tutor', 'admin'), updateCourse);
  *       200:
  *         description: Course deleted successfully
  */
-router.delete('/:id', authMiddleware, authorize('tutor', 'admin'), deleteCourse);
+router.delete(
+  "/:id",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  deleteCourse
+);
 
 module.exports = router;
