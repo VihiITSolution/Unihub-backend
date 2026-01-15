@@ -1,5 +1,8 @@
-const { Payment, Enrollment, Course, MarketplaceItem } = require('../models');
-const { v4: uuidv4 } = require('uuid');
+const { Payment, Enrollment, Course, MarketplaceItem } = require("../models");
+const crypto = require("crypto");
+
+// Replace uuid with crypto for generating unique IDs
+const uuidv4 = () => crypto.randomUUID();
 
 /**
  * Create a payment
@@ -11,7 +14,7 @@ const createPayment = async (req, res, next) => {
     if (!enrollmentId && !marketplaceItemId) {
       return res.status(400).json({
         success: false,
-        message: 'Either enrollmentId or marketplaceItemId is required'
+        message: "Either enrollmentId or marketplaceItemId is required",
       });
     }
 
@@ -19,20 +22,20 @@ const createPayment = async (req, res, next) => {
 
     if (enrollmentId) {
       const enrollment = await Enrollment.findByPk(enrollmentId, {
-        include: [{ model: Course, as: 'course' }]
+        include: [{ model: Course, as: "course" }],
       });
-      
+
       if (!enrollment) {
         return res.status(404).json({
           success: false,
-          message: 'Enrollment not found'
+          message: "Enrollment not found",
         });
       }
 
       if (enrollment.learnerId !== req.user.id) {
         return res.status(403).json({
           success: false,
-          message: 'Not authorized'
+          message: "Not authorized",
         });
       }
 
@@ -41,11 +44,11 @@ const createPayment = async (req, res, next) => {
 
     if (marketplaceItemId) {
       const item = await MarketplaceItem.findByPk(marketplaceItemId);
-      
+
       if (!item) {
         return res.status(404).json({
           success: false,
-          message: 'Marketplace item not found'
+          message: "Marketplace item not found",
         });
       }
 
@@ -59,18 +62,18 @@ const createPayment = async (req, res, next) => {
       enrollmentId,
       marketplaceItemId,
       amount: actualAmount,
-      currency: 'USD',
+      currency: "USD",
       paymentMethod,
       transactionId,
-      status: 'completed',
-      paymentGateway: 'mock',
-      paidAt: new Date()
+      status: "completed",
+      paymentGateway: "mock",
+      paidAt: new Date(),
     });
 
     res.status(201).json({
       success: true,
-      message: 'Payment processed successfully',
-      data: { payment }
+      message: "Payment processed successfully",
+      data: { payment },
     });
   } catch (error) {
     next(error);
@@ -87,23 +90,25 @@ const getPaymentHistory = async (req, res, next) => {
       include: [
         {
           model: Enrollment,
-          as: 'enrollment',
-          include: [{
-            model: Course,
-            as: 'course'
-          }]
+          as: "enrollment",
+          include: [
+            {
+              model: Course,
+              as: "course",
+            },
+          ],
         },
         {
           model: MarketplaceItem,
-          as: 'marketplaceItem'
-        }
+          as: "marketplaceItem",
+        },
       ],
-      order: [['createdAt', 'DESC']]
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
       success: true,
-      data: { payments }
+      data: { payments },
     });
   } catch (error) {
     next(error);
@@ -121,36 +126,38 @@ const getPaymentById = async (req, res, next) => {
       include: [
         {
           model: Enrollment,
-          as: 'enrollment',
-          include: [{
-            model: Course,
-            as: 'course'
-          }]
+          as: "enrollment",
+          include: [
+            {
+              model: Course,
+              as: "course",
+            },
+          ],
         },
         {
           model: MarketplaceItem,
-          as: 'marketplaceItem'
-        }
-      ]
+          as: "marketplaceItem",
+        },
+      ],
     });
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Payment not found'
+        message: "Payment not found",
       });
     }
 
-    if (payment.userId !== req.user.id && req.user.role !== 'admin') {
+    if (payment.userId !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized'
+        message: "Not authorized",
       });
     }
 
     res.status(200).json({
       success: true,
-      data: { payment }
+      data: { payment },
     });
   } catch (error) {
     next(error);
@@ -160,5 +167,5 @@ const getPaymentById = async (req, res, next) => {
 module.exports = {
   createPayment,
   getPaymentHistory,
-  getPaymentById
+  getPaymentById,
 };
