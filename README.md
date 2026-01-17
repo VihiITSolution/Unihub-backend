@@ -13,13 +13,21 @@ A comprehensive Node.js/Express backend API for the UniHub E-Learning Platform w
 - **Course Management**
   - Course creation and management (Tutors)
   - Course content upload/retrieval
+  - **🎥 YouTube Video Integration** - Automatic upload to YouTube as unlisted
   - Course search and filtering
   - Course categorization and levels
+  
+- **Video Management** ⭐ NEW
+  - **Automatic YouTube Upload** - Videos uploaded as unlisted
+  - **Secure Embedding** - Privacy-enhanced player with no branding
+  - **Access Control** - Only enrolled students can view
+  - **YouTube Storage** - Free unlimited storage and CDN
   
 - **Enrollment System**
   - Course enrollment for learners
   - Progress tracking
   - Enrollment management
+  - **Video Access Validation** - Enrollment required for video viewing
   
 - **Payment Processing**
   - Payment integration for course purchases
@@ -101,7 +109,7 @@ A comprehensive Node.js/Express backend API for the UniHub E-Learning Platform w
    Edit `.env` file with your configuration:
    ```env
    NODE_ENV=development
-   PORT=3000
+   PORT=5000
    
    DB_HOST=localhost
    DB_PORT=3306
@@ -129,6 +137,24 @@ A comprehensive Node.js/Express backend API for the UniHub E-Learning Platform w
    ```bash
    npm run seed
    ```
+
+7. **🎥 Setup YouTube Integration (for video uploads)**
+   ```bash
+   # Run the setup wizard
+   node setup-youtube.js
+   
+   # Follow prompts to:
+   # 1. Add YouTube API credentials
+   # 2. Generate OAuth token
+   
+   # Then run the migration
+   node src/migrations/add-youtube-video-id.js
+   ```
+   
+   **For detailed YouTube setup**, see:
+   - [YouTube Integration Guide](YOUTUBE_INTEGRATION_GUIDE.md) - Complete documentation
+   - [YouTube Setup](YOUTUBE_SETUP.md) - Step-by-step API setup
+   - [Tutor Guide](TUTOR_VIDEO_GUIDE.md) - Video upload instructions for tutors
 
 ## 🚀 Running the Application
 
