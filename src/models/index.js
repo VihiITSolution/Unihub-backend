@@ -1,6 +1,7 @@
 const sequelize = require('../config/sequelize');
 const User = require('./User');
 const Course = require('./Course');
+const CourseContent = require('./CourseContent');
 const Enrollment = require('./Enrollment');
 const Payment = require('./Payment');
 const MarketplaceItem = require('./MarketplaceItem');

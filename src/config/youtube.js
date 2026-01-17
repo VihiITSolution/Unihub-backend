@@ -43,12 +43,26 @@ class YouTubeUploader {
 
       const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
       const { client_secret, client_id, redirect_uris } =
-        credentials.installed || credentials.web;
+        credentials.installed || credentials.web || {};
+
+      if (!client_id || !client_secret) {
+        console.error(
+          "Invalid YouTube credentials format. Missing client_id or client_secret."
+        );
+        this.initialized = false;
+        return false;
+      }
+
+      // Use redirect_uris if available, otherwise use default
+      const redirectUri =
+        redirect_uris && redirect_uris[0]
+          ? redirect_uris[0]
+          : "http://localhost:3000/api/youtube/oauth2callback";
 
       this.oauth2Client = new google.auth.OAuth2(
         client_id,
         client_secret,
-        redirect_uris[0] || "http://localhost:5000/api/youtube/oauth2callback"
+        redirectUri
       );
 
       // Check if token exists
