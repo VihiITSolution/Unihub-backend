@@ -157,7 +157,7 @@ const getProfile = async (req, res, next) => {
     
     res.status(200).json({
       success: true,
-      data: { user: userData },
+      data: { user },
     });
   } catch (error) {
     next(error);
