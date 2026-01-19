@@ -1,4 +1,4 @@
-const { User, Course, Enrollment, Payment, MarketplaceItem } = require('../models');
+const { User, Course, Enrollment, Payment, MarketplaceItem, TutorProfile, CourseContent } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -111,14 +111,43 @@ const deleteUser = async (req, res, next) => {
 const getStatistics = async (req, res, next) => {
   try {
     const totalUsers = await User.count();
-    const totalTutors = await User.count({ where: { role: 'tutor' } });
-    const totalLearners = await User.count({ where: { role: 'learner' } });
+    
+    // Count tutors - use primaryRole field
+    const totalTutors = await User.count({ 
+      where: { primaryRole: 'tutor' } 
+    });
+    
+    // Count learners/students
+    const totalLearners = await User.count({ 
+      where: { 
+        [Op.or]: [
+          { primaryRole: 'learner' },
+          { primaryRole: 'student' }
+        ]
+      } 
+    });
+    
     const totalCourses = await Course.count();
     const publishedCourses = await Course.count({ where: { isPublished: true } });
-    const totalEnrollments = await Enrollment.count();
-    const totalPayments = await Payment.count();
-    const totalRevenue = await Payment.sum('amount', { where: { status: 'completed' } });
-    const totalMarketplaceItems = await MarketplaceItem.count();
+    
+    // These might fail if tables don't exist, wrap in try-catch
+    let totalEnrollments = 0;
+    let totalPayments = 0;
+    let totalRevenue = 0;
+    let totalMarketplaceItems = 0;
+    
+    try {
+      totalEnrollments = await Enrollment.count();
+    } catch (e) { /* table might not exist */ }
+    
+    try {
+      totalPayments = await Payment.count();
+      totalRevenue = await Payment.sum('amount', { where: { status: 'completed' } }) || 0;
+    } catch (e) { /* table might not exist */ }
+    
+    try {
+      totalMarketplaceItems = await MarketplaceItem.count();
+    } catch (e) { /* table might not exist */ }
 
     res.status(200).json({
       success: true,
@@ -229,11 +258,194 @@ const getAllMarketplaceItems = async (req, res, next) => {
   }
 };
 
+/**
+ * Get courses pending approval (Admin only)
+ */
+const getPendingCourses = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: courses } = await Course.findAndCountAll({
+      where: { approvalStatus: 'pending' },
+      include: [{
+        model: User,
+        as: 'tutor',
+        attributes: ['id', 'firstName', 'lastName', 'email']
+      }],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['submittedForReviewAt', 'ASC']]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        courses,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit)
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approve a course (Admin only)
+ */
+const approveCourse = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const course = await Course.findByPk(id);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    if (course.approvalStatus !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot approve course with status: ${course.approvalStatus}`
+      });
+    }
+
+    course.approvalStatus = 'approved';
+    course.isPublished = true;
+    course.approvedBy = req.user.id;
+    course.approvedAt = new Date();
+    course.rejectionReason = null;
+
+    await course.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Course approved and published successfully',
+      data: { course }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject a course (Admin only)
+ */
+const rejectCourse = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required'
+      });
+    }
+
+    const course = await Course.findByPk(id);
+    
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    if (course.approvalStatus !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot reject course with status: ${course.approvalStatus}`
+      });
+    }
+
+    course.approvalStatus = 'rejected';
+    course.isPublished = false;
+    course.approvedBy = req.user.id;
+    course.approvedAt = new Date();
+    course.rejectionReason = reason;
+
+    await course.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Course rejected',
+      data: { course }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get detailed course info for review (Admin only)
+ * Includes tutor profile with qualifications
+ */
+const getCourseDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const course = await Course.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: 'tutor',
+          attributes: ['id', 'firstName', 'lastName', 'email', 'bio', 'profileImage', 'createdAt'],
+          include: [{
+            model: TutorProfile,
+            as: 'tutorProfile'
+          }]
+        }
+      ]
+    });
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    // Get course content/sections
+    let courseContent = [];
+    try {
+      courseContent = await CourseContent.findAll({
+        where: { courseId: id },
+        order: [['order', 'ASC']]
+      });
+    } catch (e) {
+      // CourseContent table might not exist
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        course,
+        courseContent
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUserStatus,
   deleteUser,
   getStatistics,
   getAllCourses,
-  getAllMarketplaceItems
+  getAllMarketplaceItems,
+  getPendingCourses,
+  approveCourse,
+  rejectCourse,
+  getCourseDetails
 };

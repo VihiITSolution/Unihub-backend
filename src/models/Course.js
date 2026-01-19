@@ -69,6 +69,36 @@ const Course = sequelize.define('Course', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
     field: 'review_count'
+  },
+  // Approval workflow fields
+  approvalStatus: {
+    type: DataTypes.ENUM('draft', 'pending', 'approved', 'rejected'),
+    defaultValue: 'draft',
+    field: 'approval_status',
+    comment: 'Course approval workflow status'
+  },
+  approvedBy: {
+    type: DataTypes.INTEGER,
+    field: 'approved_by',
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    comment: 'Admin user who approved/rejected the course'
+  },
+  approvedAt: {
+    type: DataTypes.DATE,
+    field: 'approved_at'
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
+    field: 'rejection_reason',
+    comment: 'Reason for rejection if course was rejected'
+  },
+  submittedForReviewAt: {
+    type: DataTypes.DATE,
+    field: 'submitted_for_review_at',
+    comment: 'When the tutor submitted the course for review'
   }
 }, {
   tableName: 'courses',
@@ -77,3 +107,4 @@ const Course = sequelize.define('Course', {
 });
 
 module.exports = Course;
+

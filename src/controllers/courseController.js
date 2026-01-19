@@ -258,6 +258,53 @@ const getMyCourses = async (req, res, next) => {
   }
 };
 
+/**
+ * Submit course for review (Tutor only)
+ * Changes course status from 'draft' to 'pending'
+ */
+const submitForReview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const course = await Course.findByPk(id);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
+    if (course.tutorId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to submit this course",
+      });
+    }
+
+    // Only allow submitting draft or rejected courses
+    if (course.approvalStatus !== 'draft' && course.approvalStatus !== 'rejected') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot submit course with status: ${course.approvalStatus}`,
+      });
+    }
+
+    course.approvalStatus = 'pending';
+    course.submittedForReviewAt = new Date();
+    course.rejectionReason = null; // Clear previous rejection reason
+
+    await course.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Course submitted for review successfully",
+      data: { course },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createCourse,
   getCourses,
@@ -265,4 +312,5 @@ module.exports = {
   updateCourse,
   deleteCourse,
   getMyCourses,
+  submitForReview,
 };
