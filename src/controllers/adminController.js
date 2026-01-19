@@ -9,7 +9,7 @@ const getAllUsers = async (req, res, next) => {
     const { role, isActive, page = 1, limit = 10 } = req.query;
     
     const where = {};
-    if (role) where.role = role;
+    if (role) where.primaryRole = role;
     if (isActive !== undefined) where.isActive = isActive === 'true';
 
     const offset = (page - 1) * limit;
@@ -360,7 +360,7 @@ const rejectCourse = async (req, res, next) => {
       });
     }
 
-    if (course.approvalStatus !== 'pending') {
+    if (course.approvalStatus !== 'pending' && course.approvalStatus !== 'approved') {
       return res.status(400).json({
         success: false,
         message: `Cannot reject course with status: ${course.approvalStatus}`
