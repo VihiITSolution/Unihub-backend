@@ -7,6 +7,8 @@ const Payment = require('./Payment');
 const MarketplaceItem = require('./MarketplaceItem');
 const StudentProfile = require('./StudentProfile');
 const TutorProfile = require('./TutorProfile');
+const LiveSession = require('./LiveSession');
+const SessionEnrollment = require('./SessionEnrollment');
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: 'userId', as: 'studentProfile' });
@@ -60,6 +62,22 @@ Payment.belongsTo(MarketplaceItem, {
   as: "marketplaceItem",
 });
 
+// LiveSession relationships
+User.hasMany(LiveSession, { foreignKey: 'tutorId', as: 'liveSessions' });
+LiveSession.belongsTo(User, { foreignKey: 'tutorId', as: 'tutor' });
+
+Course.hasMany(LiveSession, { foreignKey: 'courseId', as: 'liveSessions' });
+LiveSession.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
+
+LiveSession.hasMany(SessionEnrollment, { foreignKey: 'sessionId', as: 'enrollments' });
+SessionEnrollment.belongsTo(LiveSession, { foreignKey: 'sessionId', as: 'session' });
+
+User.hasMany(SessionEnrollment, { foreignKey: 'studentId', as: 'sessionEnrollments' });
+SessionEnrollment.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
+
+User.hasMany(SessionEnrollment, { foreignKey: 'invitedBy', as: 'sentInvitations' });
+SessionEnrollment.belongsTo(User, { foreignKey: 'invitedBy', as: 'inviter' });
+
 module.exports = {
   sequelize,
   User,
@@ -69,6 +87,8 @@ module.exports = {
   Payment,
   MarketplaceItem,
   StudentProfile,
-  TutorProfile
+  TutorProfile,
+  LiveSession,
+  SessionEnrollment
 };
 
