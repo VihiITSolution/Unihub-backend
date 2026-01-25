@@ -126,17 +126,9 @@ const login = async (req, res, next) => {
 
     // Transform user data to match frontend expectations
     const userData = user.toJSON();
-    
-    // Preserve existing roles if present, otherwise create from legacy role field
-    if (!userData.roles || userData.roles.length === 0) {
-      const legacyRole = userData.role === "learner" ? "student" : userData.role;
-      userData.roles = legacyRole ? [legacyRole] : ['student'];
-    }
-    
-    // Set primaryRole if not present
-    if (!userData.primaryRole) {
-      userData.primaryRole = userData.roles[0] || 'student';
-    }
+    userData.roles = [userData.role === "learner" ? "student" : userData.role];
+    userData.primaryRole =
+      userData.role === "learner" ? "student" : userData.role;
 
     res.status(200).json({
       success: true,

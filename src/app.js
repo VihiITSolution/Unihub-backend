@@ -16,31 +16,16 @@ const marketplaceRoutes = require('./routes/marketplaceRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const youtubeRoutes = require('./routes/youtubeRoutes');
 const liveSessionRoutes = require('./routes/liveSessionRoutes');
+const vendorRoutes = require('./routes/vendorRoutes');
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - allow multiple origins
-const allowedOrigins = [
-  'http://localhost:3000',  // Backend (for swagger)
-  'http://localhost:3001',  // Frontend main app
-  'http://localhost:3002',  // Admin panel
-  process.env.CORS_ORIGIN   // Custom origin from env
-].filter(Boolean);
-
+// CORS configuration
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin) || process.env.CORS_ORIGIN === '*') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: process.env.CORS_ORIGIN || '*',
   credentials: true
 }));
 
@@ -84,6 +69,7 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/youtube', youtubeRoutes);
 app.use('/api/live-sessions', liveSessionRoutes);
+app.use('/api/profile/vendor', vendorRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {
