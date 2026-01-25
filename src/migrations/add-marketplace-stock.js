@@ -8,14 +8,35 @@ async function updateMarketplaceStock() {
     await sequelize.authenticate();
     console.log('Database connection established.');
 
-    // Add stock and sold_count columns to marketplace_items table
-    await sequelize.query(`
-      ALTER TABLE marketplace_items 
-      ADD COLUMN IF NOT EXISTS stock INT NOT NULL DEFAULT 0 COMMENT 'Available stock quantity',
-      ADD COLUMN IF NOT EXISTS sold_count INT DEFAULT 0 COMMENT 'Total units sold'
+    // Check if stock column exists
+    const [stockColumn] = await sequelize.query(`
+      SHOW COLUMNS FROM marketplace_items LIKE 'stock'
     `);
+    
+    if (stockColumn.length === 0) {
+      await sequelize.query(`
+        ALTER TABLE marketplace_items 
+        ADD COLUMN stock INT NOT NULL DEFAULT 0 COMMENT 'Available stock quantity'
+      `);
+      console.log('✅ stock column added to marketplace_items table');
+    } else {
+      console.log('ℹ️  stock column already exists');
+    }
 
-    console.log('✅ stock and sold_count columns added to marketplace_items table');
+    // Check if sold_count column exists
+    const [soldColumn] = await sequelize.query(`
+      SHOW COLUMNS FROM marketplace_items LIKE 'sold_count'
+    `);
+    
+    if (soldColumn.length === 0) {
+      await sequelize.query(`
+        ALTER TABLE marketplace_items 
+        ADD COLUMN sold_count INT DEFAULT 0 COMMENT 'Total units sold'
+      `);
+      console.log('✅ sold_count column added to marketplace_items table');
+    } else {
+      console.log('ℹ️  sold_count column already exists');
+    }
 
     await sequelize.close();
   } catch (error) {

@@ -408,7 +408,12 @@ const getMySales = async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    console.error('getMySales error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching sales',
+      error: error.message
+    });
   }
 };
 

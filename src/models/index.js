@@ -11,6 +11,7 @@ const VendorProfile = require('./VendorProfile');
 const Order = require('./Order');
 const LiveSession = require('./LiveSession');
 const SessionEnrollment = require('./SessionEnrollment');
+const BoardingPlace = require('./BoardingPlace');
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: 'userId', as: 'studentProfile' });
@@ -100,6 +101,10 @@ SessionEnrollment.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
 User.hasMany(SessionEnrollment, { foreignKey: 'invitedBy', as: 'sentInvitations' });
 SessionEnrollment.belongsTo(User, { foreignKey: 'invitedBy', as: 'inviter' });
 
+// User - BoardingPlace relationship (Vendor creates boarding listings)
+User.hasMany(BoardingPlace, { foreignKey: 'vendorId', as: 'boardingPlaces' });
+BoardingPlace.belongsTo(User, { foreignKey: 'vendorId', as: 'vendor' });
+
 module.exports = {
   sequelize,
   User,
@@ -113,6 +118,7 @@ module.exports = {
   VendorProfile,
   Order,
   LiveSession,
-  SessionEnrollment
+  SessionEnrollment,
+  BoardingPlace
 };
 

@@ -42,13 +42,20 @@ async function addVendorProfileTable() {
 
     console.log('✅ vendor_profiles table created successfully');
 
-    // Add is_vendor_profile_complete column to users table
-    await sequelize.query(`
-      ALTER TABLE users 
-      ADD COLUMN IF NOT EXISTS is_vendor_profile_complete BOOLEAN DEFAULT FALSE
+    // Add is_vendor_profile_complete column to users table (check if exists first)
+    const [columns] = await sequelize.query(`
+      SHOW COLUMNS FROM users LIKE 'is_vendor_profile_complete'
     `);
-
-    console.log('✅ is_vendor_profile_complete column added to users table');
+    
+    if (columns.length === 0) {
+      await sequelize.query(`
+        ALTER TABLE users 
+        ADD COLUMN is_vendor_profile_complete BOOLEAN DEFAULT FALSE
+      `);
+      console.log('✅ is_vendor_profile_complete column added to users table');
+    } else {
+      console.log('ℹ️  is_vendor_profile_complete column already exists');
+    }
 
     await sequelize.close();
   } catch (error) {
