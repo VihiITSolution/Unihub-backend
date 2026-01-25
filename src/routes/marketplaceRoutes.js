@@ -6,7 +6,11 @@ const {
   getListingById, 
   updateListing, 
   deleteListing, 
-  getMyListings 
+  getMyListings,
+  createOrder,
+  getMyOrders,
+  getMySales,
+  updateOrderStatus
 } = require('../controllers/marketplaceController');
 const { authMiddleware } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rateLimiter');
@@ -184,5 +188,142 @@ router.put('/:id', authMiddleware, updateListing);
  *         description: Listing deleted successfully
  */
 router.delete('/:id', authMiddleware, deleteListing);
+
+/**
+ * @swagger
+ * /api/marketplace/orders:
+ *   post:
+ *     tags: [Marketplace]
+ *     summary: Create order for marketplace item
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - itemId
+ *               - quantity
+ *             properties:
+ *               itemId:
+ *                 type: integer
+ *               quantity:
+ *                 type: integer
+ *               shippingAddress:
+ *                 type: string
+ *               buyerNotes:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Order created successfully
+ */
+router.post(
+  '/orders',
+  authMiddleware,
+  [
+    body('itemId').isInt().withMessage('Item ID is required'),
+    body('quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+    body('shippingAddress').optional().isString(),
+    validate
+  ],
+  createOrder
+);
+
+/**
+ * @swagger
+ * /api/marketplace/orders:
+ *   get:
+ *     tags: [Marketplace]
+ *     summary: Get my orders (buyer view)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of orders
+ */
+router.get('/orders', authMiddleware, getMyOrders);
+
+/**
+ * @swagger
+ * /api/marketplace/sales:
+ *   get:
+ *     tags: [Marketplace]
+ *     summary: Get my sales (seller view)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of sales
+ */
+router.get('/sales', authMiddleware, getMySales);
+
+/**
+ * @swagger
+ * /api/marketplace/orders/{id}:
+ *   put:
+ *     tags: [Marketplace]
+ *     summary: Update order status (seller only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, confirmed, shipped, delivered, cancelled, refunded]
+ *               trackingNumber:
+ *                 type: string
+ *               sellerNotes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Order updated successfully
+ */
+router.put(
+  '/orders/:id',
+  authMiddleware,
+  [
+    body('status').optional().isIn(['pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'refunded']),
+    validate
+  ],
+  updateOrderStatus
+);
 
 module.exports = router;

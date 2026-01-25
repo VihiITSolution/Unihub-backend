@@ -76,6 +76,11 @@ const User = sequelize.define('User', {
     defaultValue: false,
     field: 'is_tutor_profile_complete'
   },
+  isVendorProfileComplete: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_vendor_profile_complete'
+  },
   lastLogin: {
     type: DataTypes.DATE,
     field: 'last_login'
