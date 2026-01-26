@@ -92,14 +92,12 @@ const getCourses = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        courses,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
-        },
+      data: courses,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit),
       },
     });
   } catch (error) {
@@ -138,9 +136,24 @@ const getCourseById = async (req, res, next) => {
       });
     }
 
+    // Check enrollment if user is logged in
+    let isEnrolled = false;
+    if (req.user) {
+      const enrollment = await Enrollment.findOne({
+        where: {
+          courseId: id,
+          learnerId: req.user.id
+        }
+      });
+      isEnrolled = !!enrollment;
+    }
+
+    const courseData = course.toJSON();
+    courseData.isEnrolled = isEnrolled;
+
     res.status(200).json({
       success: true,
-      data: { course },
+      data: { course: courseData },
     });
   } catch (error) {
     next(error);

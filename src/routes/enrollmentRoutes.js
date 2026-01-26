@@ -1,10 +1,10 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { 
-  enrollInCourse, 
-  getMyEnrollments, 
-  updateProgress, 
-  cancelEnrollment 
+const {
+  enrollInCourse,
+  getMyEnrollments,
+  updateProgress,
+  cancelEnrollment
 } = require('../controllers/enrollmentController');
 const { authMiddleware, authorize } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rateLimiter');
@@ -38,7 +38,7 @@ const router = express.Router();
 router.post(
   '/',
   authMiddleware,
-  authorize('learner', 'admin'),
+  authorize('student', 'learner', 'admin'),
   createLimiter,
   [
     body('courseId').isInt().withMessage('Valid course ID is required'),

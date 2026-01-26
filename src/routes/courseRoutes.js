@@ -8,7 +8,7 @@ const {
   deleteCourse,
   getMyCourses,
 } = require("../controllers/courseController");
-const { authMiddleware, authorize } = require("../middleware/auth");
+const { authMiddleware, optionalAuthMiddleware, authorize } = require("../middleware/auth");
 const { createLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
 const { uploadThumbnail } = require("../config/cloudinary");
@@ -145,7 +145,7 @@ router.get(
  *       200:
  *         description: Course details
  */
-router.get("/:id", getCourseById);
+router.get("/:id", optionalAuthMiddleware, getCourseById);
 
 /**
  * @swagger

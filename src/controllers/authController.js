@@ -6,11 +6,11 @@ const { generateToken } = require('../utils/token');
  */
 const register = async (req, res, next) => {
   try {
-    const { 
-      firstName, 
-      lastName, 
-      email, 
-      password, 
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
       roles,
       primaryRole,
       phoneNumber,
@@ -89,7 +89,7 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       where: { email },
       include: [
         { model: StudentProfile, as: 'studentProfile' },
@@ -125,10 +125,15 @@ const login = async (req, res, next) => {
     const token = generateToken(user.id);
 
     // Transform user data to match frontend expectations
+    // Transform user data to match frontend expectations
     const userData = user.toJSON();
-    userData.roles = [userData.role === "learner" ? "student" : userData.role];
-    userData.primaryRole =
-      userData.role === "learner" ? "student" : userData.role;
+    // Ensure roles are available
+    if (!userData.roles) {
+      userData.roles = ['student'];
+    }
+    if (!userData.primaryRole) {
+      userData.primaryRole = userData.roles[0];
+    }
 
     res.status(200).json({
       success: true,
@@ -154,7 +159,7 @@ const getProfile = async (req, res, next) => {
         { model: TutorProfile, as: 'tutorProfile' }
       ]
     });
-    
+
     res.status(200).json({
       success: true,
       data: { user },
