@@ -7,6 +7,7 @@ const {
   updateCourse,
   deleteCourse,
   getMyCourses,
+  submitForReview,
 } = require("../controllers/courseController");
 const { authMiddleware, optionalAuthMiddleware, authorize } = require("../middleware/auth");
 const { createLimiter } = require("../middleware/rateLimiter");
@@ -196,6 +197,31 @@ router.delete(
   authMiddleware,
   authorize("tutor", "admin"),
   deleteCourse
+);
+
+/**
+ * @swagger
+ * /api/courses/{id}/submit-for-review:
+ *   post:
+ *     tags: [Courses]
+ *     summary: Submit course for review (Tutor only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Course submitted for review
+ */
+router.post(
+  "/:id/submit-for-review",
+  authMiddleware,
+  authorize("tutor"),
+  submitForReview
 );
 
 module.exports = router;

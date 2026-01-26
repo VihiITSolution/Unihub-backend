@@ -15,6 +15,9 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const marketplaceRoutes = require('./routes/marketplaceRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const youtubeRoutes = require('./routes/youtubeRoutes');
+const liveSessionRoutes = require('./routes/liveSessionRoutes');
+const vendorRoutes = require('./routes/vendorRoutes');
+const boardingRoutes = require('./routes/boardingRoutes');
 
 const app = express();
 
@@ -66,6 +69,9 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/youtube', youtubeRoutes);
+app.use('/api/live-sessions', liveSessionRoutes);
+app.use('/api/profile/vendor', vendorRoutes);
+app.use('/api/boarding', boardingRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

@@ -39,11 +39,29 @@ const MarketplaceItem = sequelize.define('MarketplaceItem', {
   },
   price: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false
+    allowNull: false,
+    validate: {
+      min: 0
+    }
   },
   images: {
     type: DataTypes.JSON,
     comment: 'Array of image URLs'
+  },
+  stock: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: {
+      min: 0
+    },
+    comment: 'Available stock quantity'
+  },
+  soldCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'sold_count',
+    comment: 'Total units sold'
   },
   location: {
     type: DataTypes.STRING(255)
