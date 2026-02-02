@@ -1,5 +1,6 @@
 require('dotenv').config();
-const { User, Course, MarketplaceItem } = require('../models');
+const { User, Course, MarketplaceItem, CourseContent } = require('../models');
+
 
 const seedData = async () => {
   try {
@@ -73,47 +74,102 @@ const seedData = async () => {
     const course1 = await Course.create({
       tutorId: tutor1.id,
       title: 'Introduction to Web Development',
-      description: 'Learn the basics of HTML, CSS, and JavaScript to build modern websites',
-      category: 'Programming',
+      description: 'Learn the basics of HTML, CSS, and JavaScript to build modern websites. This course covers everything from basic syntax to advanced layouts.',
+      category: 'web-dev',
       level: 'beginner',
       price: 49.99,
-      duration: 40,
+      duration: 1200, // 20 hours
+      thumbnail: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80',
+      rating: 4.8,
+      enrollmentCount: 1250,
+      approvalStatus: 'approved',
       isPublished: true
     });
 
     const course2 = await Course.create({
       tutorId: tutor1.id,
-      title: 'Advanced JavaScript and React',
-      description: 'Master modern JavaScript and React framework for building dynamic web applications',
-      category: 'Programming',
+      title: 'Advanced React & Next.js',
+      description: 'Master modern React patterns, Server Components, and Next.js App Router. Build high-performance applications with ease.',
+      category: 'web-dev',
       level: 'advanced',
-      price: 99.99,
-      duration: 60,
+      price: 89.99,
+      duration: 1500, // 25 hours
+      thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80',
+      rating: 4.9,
+      enrollmentCount: 850,
+      approvalStatus: 'approved',
       isPublished: true
     });
 
     const course3 = await Course.create({
       tutorId: tutor2.id,
-      title: 'Calculus I - Complete Course',
-      description: 'Comprehensive calculus course covering limits, derivatives, and integrals',
-      category: 'Mathematics',
-      level: 'intermediate',
-      price: 79.99,
-      duration: 50,
+      title: 'Data Science Fundamentals',
+      description: 'Start your journey into data science. Learn Python, Pandas, and Scikit-Learn to analyze and visualize data.',
+      category: 'data-science',
+      level: 'beginner',
+      price: 59.99,
+      duration: 1800, // 30 hours
+      thumbnail: 'https://images.unsplash.com/photo-1551288049-bb8c803er9a8?auto=format&fit=crop&w=800&q=80',
+      rating: 4.7,
+      enrollmentCount: 2100,
+      approvalStatus: 'approved',
       isPublished: true
     });
 
     const course4 = await Course.create({
       tutorId: tutor2.id,
-      title: 'Linear Algebra Fundamentals',
-      description: 'Learn the fundamentals of linear algebra including vectors, matrices, and systems of equations',
-      category: 'Mathematics',
-      level: 'beginner',
-      price: 59.99,
-      duration: 35,
+      title: 'Business Strategy 101',
+      description: 'Learn how to develop and implement effective business strategies. Perfect for entrepreneurs and business students.',
+      category: 'business',
+      level: 'intermediate',
+      price: 69.99,
+      duration: 900, // 15 hours
+      thumbnail: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80',
+      rating: 4.6,
+      enrollmentCount: 540,
+      approvalStatus: 'approved',
       isPublished: true
     });
-    console.log('✓ Sample courses created');
+
+    // Create course contents
+    await CourseContent.create({
+      courseId: course1.id,
+      title: '1. Getting Started with HTML',
+      type: 'video',
+      url: 'https://www.youtube.com/watch?v=kUMe1FH4CHE',
+      duration: 45,
+      order: 1
+    });
+
+    await CourseContent.create({
+      courseId: course1.id,
+      title: '2. CSS Fundamentals',
+      type: 'video',
+      url: 'https://www.youtube.com/watch?v=1Rs2ND1ryYc',
+      duration: 60,
+      order: 2
+    });
+
+    await CourseContent.create({
+      courseId: course2.id,
+      title: '1. Introduction to Next.js',
+      type: 'video',
+      url: 'https://www.youtube.com/watch?v=SqcY0GlETPk',
+      duration: 30,
+      order: 1
+    });
+
+    await CourseContent.create({
+      courseId: course3.id,
+      title: '1. Python for Data Science',
+      type: 'video',
+      url: 'https://www.youtube.com/watch?v=rfscVS0vtbw',
+      duration: 120,
+      order: 1
+    });
+
+    console.log('✓ Sample courses and content created');
+
 
     // Create sample marketplace items
     await MarketplaceItem.create({
