@@ -25,10 +25,15 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',')
+  : '*';
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: allowedOrigins,
   credentials: true
 }));
+
 
 // Body parser middleware
 app.use(express.json());

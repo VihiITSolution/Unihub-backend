@@ -11,7 +11,8 @@ const seedData = async () => {
       lastName: 'User',
       email: 'admin@unihub.com',
       password: 'admin123',
-      role: 'admin',
+      roles: ['admin'],
+      primaryRole: 'admin',
       isVerified: true,
       isActive: true
     });
@@ -23,7 +24,8 @@ const seedData = async () => {
       lastName: 'Smith',
       email: 'john.smith@unihub.com',
       password: 'tutor123',
-      role: 'tutor',
+      roles: ['tutor'],
+      primaryRole: 'tutor',
       bio: 'Experienced software developer and instructor',
       isVerified: true,
       isActive: true
@@ -34,7 +36,8 @@ const seedData = async () => {
       lastName: 'Johnson',
       email: 'sarah.johnson@unihub.com',
       password: 'tutor123',
-      role: 'tutor',
+      roles: ['tutor'],
+      primaryRole: 'tutor',
       bio: 'Mathematics expert with 10+ years of teaching experience',
       isVerified: true,
       isActive: true
@@ -47,7 +50,8 @@ const seedData = async () => {
       lastName: 'Davis',
       email: 'mike.davis@unihub.com',
       password: 'learner123',
-      role: 'learner',
+      roles: ['student'],
+      primaryRole: 'student',
       isVerified: true,
       isActive: true
     });
@@ -57,10 +61,12 @@ const seedData = async () => {
       lastName: 'Brown',
       email: 'emily.brown@unihub.com',
       password: 'learner123',
-      role: 'learner',
+      roles: ['student'],
+      primaryRole: 'student',
       isVerified: true,
       isActive: true
     });
+
     console.log('✓ Learner users created');
 
     // Create sample courses
@@ -171,9 +177,17 @@ const seedData = async () => {
 
     process.exit(0);
   } catch (error) {
-    console.error('Seeding failed:', error);
+    console.error('Seeding failed!');
+    if (error.name === 'SequelizeValidationError') {
+      console.error('Validation Errors:', error.errors.map(e => `${e.path}: ${e.message}`));
+    } else if (error.name === 'SequelizeUniqueConstraintError') {
+      console.error('Unique Constraint Errors:', error.errors.map(e => `${e.path}: ${e.message}`));
+    } else {
+      console.error(error);
+    }
     process.exit(1);
   }
+
 };
 
 seedData();
