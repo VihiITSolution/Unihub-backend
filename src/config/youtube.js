@@ -35,7 +35,7 @@ class YouTubeUploader {
       // Check if credentials exist
       if (!fs.existsSync(credentialsPath)) {
         console.warn(
-          "YouTube credentials not found. Video uploads will be stored locally."
+          "YouTube credentials not found. Video uploads will be stored locally.",
         );
         this.initialized = false;
         return false;
@@ -45,10 +45,14 @@ class YouTubeUploader {
       const { client_secret, client_id, redirect_uris } =
         credentials.installed || credentials.web;
 
+      const redirectUri =
+        (redirect_uris && redirect_uris[0]) ||
+        "http://localhost:5000/api/youtube/oauth2callback";
+
       this.oauth2Client = new google.auth.OAuth2(
         client_id,
         client_secret,
-        redirect_uris[0] || "http://localhost:5000/api/youtube/oauth2callback"
+        redirectUri,
       );
 
       // Check if token exists
@@ -64,7 +68,7 @@ class YouTubeUploader {
         return true;
       } else {
         console.warn(
-          "YouTube token not found. Please complete OAuth flow first."
+          "YouTube token not found. Please complete OAuth flow first.",
         );
         this.initialized = false;
         return false;
@@ -131,6 +135,25 @@ class YouTubeUploader {
    * This is needed only once to get the refresh token
    */
   getAuthUrl() {
+    // Initialize oauth2Client if not already done
+    if (!this.oauth2Client) {
+      const credentialsPath = path.join(__dirname, "youtube-credentials.json");
+
+      if (!fs.existsSync(credentialsPath)) {
+        throw new Error("YouTube credentials file not found");
+      }
+
+      const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
+      const { client_secret, client_id, redirect_uris } =
+        credentials.installed || credentials.web;
+
+      this.oauth2Client = new google.auth.OAuth2(
+        client_id,
+        client_secret,
+        redirect_uris[0] || "http://localhost:5000/api/youtube/oauth2callback",
+      );
+    }
+
     const scopes = ["https://www.googleapis.com/auth/youtube.upload"];
 
     const url = this.oauth2Client.generateAuthUrl({

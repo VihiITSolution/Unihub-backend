@@ -1,10 +1,11 @@
 const { CourseContent } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const path = require("path");
+const fs = require("fs");
 
 /**
  * Add content to a course (video lesson or PDF)
- * Currently using Cloudinary for video uploads until YouTube is configured
+ * Videos are uploaded to YouTube (unlisted) if configured, otherwise stored locally
  */
 const addCourseContent = async (req, res, next) => {
   try {
@@ -12,11 +13,34 @@ const addCourseContent = async (req, res, next) => {
     const { title, type, duration, order } = req.body;
     let url;
 
-    // If video file is uploaded, use Cloudinary URL (temporary solution)
+    // If video file is uploaded
     if (req.file && type === "video") {
-      // Cloudinary automatically uploads the file and provides the URL in req.file.path
-      url = req.file.path;
-      console.log("Video uploaded to Cloudinary:", url);
+      // Try to upload to YouTube if configured
+      if (youtubeUploader.initialized) {
+        try {
+          console.log("Uploading video to YouTube...");
+          console.log("File path:", req.file.path);
+          url = await youtubeUploader.uploadVideo(
+            req.file.path,
+            title,
+            `Course content for course ID: ${courseId}`,
+          );
+          console.log("Video uploaded to YouTube:", url);
+          // Note: The uploadVideo function already deletes the local file
+        } catch (error) {
+          console.error(
+            "YouTube upload failed:",
+            error.message,
+          );
+          // Fallback to local file URL if YouTube fails
+          url = `/uploads/videos/${path.basename(req.file.path)}`;
+          console.log("Using local file URL:", url);
+        }
+      } else {
+        // Use local file URL if YouTube is not configured
+        url = `/uploads/videos/${path.basename(req.file.path)}`;
+        console.log("YouTube not configured, using local file:", url);
+      }
     } else if (req.body.url) {
       // Use provided URL (for PDFs or if video URL is manually provided)
       url = req.body.url;

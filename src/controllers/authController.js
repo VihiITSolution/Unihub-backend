@@ -1,21 +1,21 @@
-const { User, StudentProfile, TutorProfile } = require('../models');
-const { generateToken } = require('../utils/token');
+const { User, StudentProfile, TutorProfile } = require("../models");
+const { generateToken } = require("../utils/token");
 
 /**
  * Register a new user with optional student profile
  */
 const register = async (req, res, next) => {
   try {
-    const { 
-      firstName, 
-      lastName, 
-      email, 
-      password, 
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
       roles,
       primaryRole,
       phoneNumber,
       // Student profile fields
-      studentProfile
+      studentProfile,
     } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
@@ -27,7 +27,7 @@ const register = async (req, res, next) => {
     }
 
     // Determine roles - default to student if not provided
-    const userRoles = roles && roles.length > 0 ? roles : ['student'];
+    const userRoles = roles && roles.length > 0 ? roles : ["student"];
     const userPrimaryRole = primaryRole || userRoles[0];
 
     const user = await User.create({
@@ -37,11 +37,11 @@ const register = async (req, res, next) => {
       password,
       roles: userRoles,
       primaryRole: userPrimaryRole,
-      phoneNumber
+      phoneNumber,
     });
 
     // If registering as student with profile data, create student profile
-    if (userRoles.includes('student') && studentProfile) {
+    if (userRoles.includes("student") && studentProfile) {
       await StudentProfile.create({
         userId: user.id,
         universityName: studentProfile.universityName,
@@ -54,7 +54,7 @@ const register = async (req, res, next) => {
         currentAddress: studentProfile.currentAddress,
         phoneNumber: studentProfile.phoneNumber || phoneNumber,
         dateOfBirth: studentProfile.dateOfBirth,
-        isProfileComplete: true
+        isProfileComplete: true,
       });
       user.isStudentProfileComplete = true;
       await user.save();
@@ -64,9 +64,7 @@ const register = async (req, res, next) => {
 
     // Reload user with profile
     const userWithProfile = await User.findByPk(user.id, {
-      include: [
-        { model: StudentProfile, as: 'studentProfile' }
-      ]
+      include: [{ model: StudentProfile, as: "studentProfile" }],
     });
 
     res.status(201).json({
@@ -74,8 +72,8 @@ const register = async (req, res, next) => {
       message: "User registered successfully",
       data: {
         user: userWithProfile,
-        token
-      }
+        token,
+      },
     });
   } catch (error) {
     next(error);
@@ -89,12 +87,12 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       where: { email },
       include: [
-        { model: StudentProfile, as: 'studentProfile' },
-        { model: TutorProfile, as: 'tutorProfile' }
-      ]
+        { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
+      ],
     });
 
     if (!user) {
@@ -126,9 +124,19 @@ const login = async (req, res, next) => {
 
     // Transform user data to match frontend expectations
     const userData = user.toJSON();
-    userData.roles = [userData.role === "learner" ? "student" : userData.role];
-    userData.primaryRole =
-      userData.role === "learner" ? "student" : userData.role;
+
+    // Ensure roles array exists and is properly formatted
+    if (!userData.roles || !Array.isArray(userData.roles)) {
+      // Fallback: create roles array from single role field if it exists
+      const singleRole =
+        userData.role === "learner" ? "student" : userData.role;
+      userData.roles = [singleRole];
+    }
+
+    // Ensure primaryRole is set
+    if (!userData.primaryRole) {
+      userData.primaryRole = userData.roles[0];
+    }
 
     res.status(200).json({
       success: true,
@@ -150,14 +158,14 @@ const getProfile = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
       include: [
-        { model: StudentProfile, as: 'studentProfile' },
-        { model: TutorProfile, as: 'tutorProfile' }
-      ]
+        { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
+      ],
     });
-    
+
     res.status(200).json({
       success: true,
-      data: { user: userData },
+      data: { user },
     });
   } catch (error) {
     next(error);
@@ -196,4 +204,3 @@ module.exports = {
   getProfile,
   updateProfile,
 };
-
