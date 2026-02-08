@@ -1,9 +1,14 @@
-const express = require('express');
-const { body } = require('express-validator');
-const { register, login, getProfile, updateProfile } = require('../controllers/authController');
-const { authMiddleware } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimiter');
-const validate = require('../middleware/validate');
+const express = require("express");
+const { body } = require("express-validator");
+const {
+  register,
+  login,
+  getProfile,
+  updateProfile,
+} = require("../controllers/authController");
+const { authMiddleware } = require("../middleware/auth");
+const { authLimiter } = require("../middleware/rateLimiter");
+const validate = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -37,7 +42,7 @@ const router = express.Router();
  *                 format: password
  *               role:
  *                 type: string
- *                 enum: [learner, tutor]
+ *                 enum: [student, tutor]
  *               phoneNumber:
  *                 type: string
  *     responses:
@@ -45,17 +50,22 @@ const router = express.Router();
  *         description: User registered successfully
  */
 router.post(
-  '/register',
+  "/register",
   authLimiter,
   [
-    body('firstName').trim().notEmpty().withMessage('First name is required'),
-    body('lastName').trim().notEmpty().withMessage('Last name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('role').optional().isIn(['learner', 'tutor']).withMessage('Invalid role'),
-    validate
+    body("firstName").trim().notEmpty().withMessage("First name is required"),
+    body("lastName").trim().notEmpty().withMessage("Last name is required"),
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("password")
+      .isLength({ min: 6 })
+      .withMessage("Password must be at least 6 characters"),
+    body("role")
+      .optional()
+      .isIn(["student", "tutor"])
+      .withMessage("Invalid role"),
+    validate,
   ],
-  register
+  register,
 );
 
 /**
@@ -85,14 +95,14 @@ router.post(
  *         description: Login successful
  */
 router.post(
-  '/login',
+  "/login",
   authLimiter,
   [
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').notEmpty().withMessage('Password is required'),
-    validate
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("password").notEmpty().withMessage("Password is required"),
+    validate,
   ],
-  login
+  login,
 );
 
 /**
@@ -107,7 +117,7 @@ router.post(
  *       200:
  *         description: User profile retrieved
  */
-router.get('/profile', authMiddleware, getProfile);
+router.get("/profile", authMiddleware, getProfile);
 
 /**
  * @swagger
@@ -137,6 +147,6 @@ router.get('/profile', authMiddleware, getProfile);
  *       200:
  *         description: Profile updated successfully
  */
-router.put('/profile', authMiddleware, updateProfile);
+router.put("/profile", authMiddleware, updateProfile);
 
 module.exports = router;

@@ -35,7 +35,7 @@ class YouTubeUploader {
       // Check if credentials exist
       if (!fs.existsSync(credentialsPath)) {
         console.warn(
-          "YouTube credentials not found. Video uploads will be stored locally."
+          "YouTube credentials not found. Video uploads will be stored locally.",
         );
         this.initialized = false;
         return false;
@@ -59,6 +59,10 @@ class YouTubeUploader {
           ? redirect_uris[0]
           : "http://localhost:3000/api/youtube/oauth2callback";
 
+      const redirectUri =
+        (redirect_uris && redirect_uris[0]) ||
+        "http://localhost:5000/api/youtube/oauth2callback";
+
       this.oauth2Client = new google.auth.OAuth2(
         client_id,
         client_secret,
@@ -78,7 +82,7 @@ class YouTubeUploader {
         return true;
       } else {
         console.warn(
-          "YouTube token not found. Please complete OAuth flow first."
+          "YouTube token not found. Please complete OAuth flow first.",
         );
         this.initialized = false;
         return false;

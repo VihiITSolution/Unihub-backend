@@ -36,15 +36,15 @@ const router = express.Router();
  *         description: Enrolled successfully
  */
 router.post(
-  '/',
+  "/",
   authMiddleware,
   authorize('student', 'learner', 'admin'),
   createLimiter,
   [
-    body('courseId').isInt().withMessage('Valid course ID is required'),
-    validate
+    body("courseId").isInt().withMessage("Valid course ID is required"),
+    validate,
   ],
-  enrollInCourse
+  enrollInCourse,
 );
 
 /**
@@ -59,7 +59,12 @@ router.post(
  *       200:
  *         description: List of enrollments
  */
-router.get('/', authMiddleware, authorize('learner', 'admin'), getMyEnrollments);
+router.get(
+  "/",
+  authMiddleware,
+  authorize("student", "admin"),
+  getMyEnrollments,
+);
 
 /**
  * @swagger
@@ -93,10 +98,10 @@ router.get('/', authMiddleware, authorize('learner', 'admin'), getMyEnrollments)
  *         description: Progress updated successfully
  */
 router.put(
-  '/:id/progress',
+  "/:id/progress",
   authMiddleware,
-  authorize('learner', 'admin'),
-  updateProgress
+  authorize("student", "admin"),
+  updateProgress,
 );
 
 /**
@@ -118,10 +123,10 @@ router.put(
  *         description: Enrollment cancelled successfully
  */
 router.put(
-  '/:id/cancel',
+  "/:id/cancel",
   authMiddleware,
-  authorize('learner', 'admin'),
-  cancelEnrollment
+  authorize("student", "admin"),
+  cancelEnrollment,
 );
 
 module.exports = router;

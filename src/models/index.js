@@ -14,18 +14,18 @@ const SessionEnrollment = require('./SessionEnrollment');
 const BoardingPlace = require('./BoardingPlace');
 
 // User - Profile relationships
-User.hasOne(StudentProfile, { foreignKey: 'userId', as: 'studentProfile' });
-StudentProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
+StudentProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-User.hasOne(TutorProfile, { foreignKey: 'userId', as: 'tutorProfile' });
-TutorProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasOne(TutorProfile, { foreignKey: "userId", as: "tutorProfile" });
+TutorProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
 
 User.hasOne(VendorProfile, { foreignKey: 'userId', as: 'vendorProfile' });
 VendorProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // TutorProfile - Admin approval relationship
-User.hasMany(TutorProfile, { foreignKey: 'approvedBy', as: 'approvedTutors' });
-TutorProfile.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver' });
+User.hasMany(TutorProfile, { foreignKey: "approvedBy", as: "approvedTutors" });
+TutorProfile.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 
 // VendorProfile - Admin approval relationship
 User.hasMany(VendorProfile, { foreignKey: 'approvedBy', as: 'approvedVendors' });
@@ -121,4 +121,3 @@ module.exports = {
   SessionEnrollment,
   BoardingPlace
 };
-

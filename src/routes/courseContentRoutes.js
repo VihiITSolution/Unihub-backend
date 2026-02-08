@@ -26,7 +26,7 @@ router.post(
       .withMessage("Type must be video or pdf"),
     validate,
   ],
-  addCourseContent
+  addCourseContent,
 );
 
 // Get all content for a course
@@ -40,7 +40,7 @@ router.put(
   "/content/:contentId",
   authMiddleware,
   authorize("tutor", "admin"),
-  updateCourseContent
+  updateCourseContent,
 );
 
 // Delete course content
@@ -48,7 +48,7 @@ router.delete(
   "/content/:contentId",
   authMiddleware,
   authorize("tutor", "admin"),
-  deleteCourseContent
+  deleteCourseContent,
 );
 
 module.exports = router;
