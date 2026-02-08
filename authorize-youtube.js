@@ -17,7 +17,7 @@ async function authorizeYouTube() {
   console.log("This will open a browser window for YouTube authorization.");
   console.log("Sign in with your UniHub YouTube account.\n");
 
-  const authUrl = "http://localhost:5000/api/youtube/auth";
+  const authUrl = "http://localhost:3000/api/youtube/auth";
 
   try {
     // First, get the auth URL from our server

@@ -5,6 +5,7 @@ const {
   getCourseContent,
   updateCourseContent,
   deleteCourseContent,
+  getContentById,
 } = require("../controllers/courseContentController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 const validate = require("../middleware/validate");
@@ -30,6 +31,9 @@ router.post(
 
 // Get all content for a course
 router.get("/courses/:courseId/content", getCourseContent);
+
+// Get specific content by ID (requires enrollment)
+router.get("/content/:contentId", authMiddleware, getContentById);
 
 // Update course content
 router.put(

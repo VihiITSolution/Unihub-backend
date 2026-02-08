@@ -43,7 +43,21 @@ class YouTubeUploader {
 
       const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
       const { client_secret, client_id, redirect_uris } =
-        credentials.installed || credentials.web;
+        credentials.installed || credentials.web || {};
+
+      if (!client_id || !client_secret) {
+        console.error(
+          "Invalid YouTube credentials format. Missing client_id or client_secret."
+        );
+        this.initialized = false;
+        return false;
+      }
+
+      // Use redirect_uris if available, otherwise use default
+      const redirectUri =
+        redirect_uris && redirect_uris[0]
+          ? redirect_uris[0]
+          : "http://localhost:3000/api/youtube/oauth2callback";
 
       const redirectUri =
         (redirect_uris && redirect_uris[0]) ||
@@ -52,7 +66,7 @@ class YouTubeUploader {
       this.oauth2Client = new google.auth.OAuth2(
         client_id,
         client_secret,
-        redirectUri,
+        redirectUri
       );
 
       // Check if token exists
@@ -135,26 +149,11 @@ class YouTubeUploader {
    * This is needed only once to get the refresh token
    */
   getAuthUrl() {
-    // Initialize oauth2Client if not already done
-    if (!this.oauth2Client) {
-      const credentialsPath = path.join(__dirname, "youtube-credentials.json");
-
-      if (!fs.existsSync(credentialsPath)) {
-        throw new Error("YouTube credentials file not found");
-      }
-
-      const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
-      const { client_secret, client_id, redirect_uris } =
-        credentials.installed || credentials.web;
-
-      this.oauth2Client = new google.auth.OAuth2(
-        client_id,
-        client_secret,
-        redirect_uris[0] || "http://localhost:5000/api/youtube/oauth2callback",
-      );
-    }
-
-    const scopes = ["https://www.googleapis.com/auth/youtube.upload"];
+    const scopes = [
+      "https://www.googleapis.com/auth/youtube.upload",
+      "https://www.googleapis.com/auth/youtube",
+      "https://www.googleapis.com/auth/youtube.force-ssl"
+    ];
 
     const url = this.oauth2Client.generateAuthUrl({
       access_type: "offline",
@@ -183,6 +182,173 @@ class YouTubeUploader {
       return tokens;
     } catch (error) {
       console.error("Failed to get token:", error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a YouTube Live broadcast
+   * @param {Object} broadcastData - Broadcast configuration
+   * @returns {Promise<Object>} Broadcast and stream details
+   */
+  async createLiveBroadcast(broadcastData) {
+    if (!this.initialized) {
+      throw new Error('YouTube API not initialized');
+    }
+
+    const {
+      title,
+      description,
+      scheduledStartTime,
+      scheduledEndTime,
+      privacyStatus = 'unlisted', // unlisted, private, or public
+      enableChat = true,
+      enableDvr = true,
+      enableAutoStart = true,
+      enableAutoStop = true
+    } = broadcastData;
+
+    try {
+      // Create the broadcast
+      const broadcastResponse = await this.youtube.liveBroadcasts.insert({
+        part: ['snippet', 'contentDetails', 'status'],
+        requestBody: {
+          snippet: {
+            title,
+            description,
+            scheduledStartTime: new Date(scheduledStartTime).toISOString(),
+            scheduledEndTime: new Date(scheduledEndTime).toISOString(),
+          },
+          contentDetails: {
+            enableDvr,
+            enableAutoStart,
+            enableAutoStop,
+            enableClosedCaptions: false,
+            recordFromStart: true,
+            startWithSlate: false
+          },
+          status: {
+            privacyStatus,
+            selfDeclaredMadeForKids: false
+          }
+        }
+      });
+
+      const broadcast = broadcastResponse.data;
+
+      // Create the live stream
+      const streamResponse = await this.youtube.liveStreams.insert({
+        part: ['snippet', 'cdn', 'contentDetails', 'status'],
+        requestBody: {
+          snippet: {
+            title: `Stream for: ${title}`
+          },
+          cdn: {
+            frameRate: 'variable',
+            ingestionType: 'rtmp',
+            resolution: 'variable'
+          },
+          contentDetails: {
+            isReusable: false
+          }
+        }
+      });
+
+      const stream = streamResponse.data;
+
+      // Bind broadcast to stream
+      await this.youtube.liveBroadcasts.bind({
+        part: ['id', 'contentDetails'],
+        id: broadcast.id,
+        streamId: stream.id
+      });
+
+      return {
+        broadcastId: broadcast.id,
+        videoId: broadcast.id, // YouTube uses broadcast ID as video ID for live
+        streamId: stream.id,
+        streamKey: stream.cdn.ingestionInfo.streamName,
+        streamUrl: stream.cdn.ingestionInfo.ingestionAddress,
+        watchUrl: `https://www.youtube.com/watch?v=${broadcast.id}`,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${broadcast.id}`,
+        chatUrl: `https://www.youtube.com/live_chat?v=${broadcast.id}`,
+        status: broadcast.status.lifeCycleStatus,
+        privacyStatus: broadcast.status.privacyStatus
+      };
+    } catch (error) {
+      console.error('Failed to create YouTube Live broadcast:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Start a YouTube Live broadcast
+   * @param {string} broadcastId - Broadcast ID
+   */
+  async startBroadcast(broadcastId) {
+    if (!this.initialized) {
+      throw new Error('YouTube API not initialized');
+    }
+
+    try {
+      const response = await this.youtube.liveBroadcasts.transition({
+        broadcastStatus: 'live',
+        id: broadcastId,
+        part: ['status']
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to start broadcast:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * End a YouTube Live broadcast
+   * @param {string} broadcastId - Broadcast ID
+   */
+  async endBroadcast(broadcastId) {
+    if (!this.initialized) {
+      throw new Error('YouTube API not initialized');
+    }
+
+    try {
+      const response = await this.youtube.liveBroadcasts.transition({
+        broadcastStatus: 'complete',
+        id: broadcastId,
+        part: ['status']
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to end broadcast:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get broadcast status
+   * @param {string} broadcastId - Broadcast ID
+   */
+  async getBroadcastStatus(broadcastId) {
+    if (!this.initialized) {
+      throw new Error('YouTube API not initialized');
+    }
+
+    try {
+      const response = await this.youtube.liveBroadcasts.list({
+        part: ['status', 'snippet'],
+        id: broadcastId
+      });
+
+      if (response.data.items && response.data.items.length > 0) {
+        return response.data.items[0];
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to get broadcast status:', error.message);
       throw error;
     }
   }

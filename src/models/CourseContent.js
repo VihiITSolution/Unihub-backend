@@ -31,6 +31,12 @@ const CourseContent = sequelize.define(
       allowNull: false,
       comment: "YouTube URL for videos, file path for PDFs",
     },
+    youtubeVideoId: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: "youtube_video_id",
+      comment: "YouTube video ID for unlisted videos",
+    },
     duration: {
       type: DataTypes.INTEGER,
       comment: "Duration in minutes for videos",

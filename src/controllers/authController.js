@@ -123,17 +123,12 @@ const login = async (req, res, next) => {
     const token = generateToken(user.id);
 
     // Transform user data to match frontend expectations
+    // Transform user data to match frontend expectations
     const userData = user.toJSON();
-
-    // Ensure roles array exists and is properly formatted
-    if (!userData.roles || !Array.isArray(userData.roles)) {
-      // Fallback: create roles array from single role field if it exists
-      const singleRole =
-        userData.role === "learner" ? "student" : userData.role;
-      userData.roles = [singleRole];
+    // Ensure roles are available
+    if (!userData.roles) {
+      userData.roles = ['student'];
     }
-
-    // Ensure primaryRole is set
     if (!userData.primaryRole) {
       userData.primaryRole = userData.roles[0];
     }
