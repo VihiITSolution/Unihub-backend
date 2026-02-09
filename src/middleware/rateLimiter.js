@@ -1,12 +1,15 @@
-const rateLimit = require('express-rate-limit');
+const rateLimit = require("express-rate-limit");
+
+// Determine if we're in development mode
+const isDevelopment = process.env.NODE_ENV === "development";
 
 // General API rate limiter
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: isDevelopment ? 1000 : 100, // Much higher limit for development
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again later.'
+    message: "Too many requests from this IP, please try again later.",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -15,10 +18,10 @@ const apiLimiter = rateLimit({
 // Stricter rate limiter for authentication endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
+  max: isDevelopment ? 50 : 5, // More relaxed for development
   message: {
     success: false,
-    message: 'Too many authentication attempts, please try again later.'
+    message: "Too many authentication attempts, please try again later.",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -28,10 +31,10 @@ const authLimiter = rateLimit({
 // Rate limiter for creating resources
 const createLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 20 create requests per windowMs
+  max: isDevelopment ? 200 : 20, // More relaxed for development
   message: {
     success: false,
-    message: 'Too many creation requests, please try again later.'
+    message: "Too many creation requests, please try again later.",
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -40,5 +43,5 @@ const createLimiter = rateLimit({
 module.exports = {
   apiLimiter,
   authLimiter,
-  createLimiter
+  createLimiter,
 };

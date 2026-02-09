@@ -198,9 +198,62 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Switch user's primary role
+ */
+const switchRole = async (req, res, next) => {
+  try {
+    const { primaryRole } = req.body;
+    const userId = req.user.id;
+
+    if (!primaryRole) {
+      return res.status(400).json({
+        success: false,
+        message: "Primary role is required",
+      });
+    }
+
+    // Get user with profiles
+    const user = await User.findByPk(userId, {
+      include: [
+        { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if user has the requested role
+    if (!user.roles || !user.roles.includes(primaryRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "You don't have access to this role",
+      });
+    }
+
+    // Update primary role
+    user.primaryRole = primaryRole;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Role switched successfully",
+      data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   getProfile,
   updateProfile,
+  switchRole,
 };

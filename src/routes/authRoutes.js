@@ -5,6 +5,7 @@ const {
   login,
   getProfile,
   updateProfile,
+  switchRole,
 } = require("../controllers/authController");
 const { authMiddleware } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimiter");
@@ -148,5 +149,36 @@ router.get("/profile", authMiddleware, getProfile);
  *         description: Profile updated successfully
  */
 router.put("/profile", authMiddleware, updateProfile);
+
+/**
+ * @swagger
+ * /api/auth/switch-role:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Switch user's primary role
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - primaryRole
+ *             properties:
+ *               primaryRole:
+ *                 type: string
+ *                 enum: [student, tutor, vendor, admin]
+ *                 description: The role to switch to
+ *     responses:
+ *       200:
+ *         description: Role switched successfully
+ *       400:
+ *         description: Invalid role or user doesn't have this role
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/switch-role", authMiddleware, switchRole);
 
 module.exports = router;
