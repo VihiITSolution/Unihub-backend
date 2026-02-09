@@ -1,14 +1,16 @@
-const express = require('express');
-const { body } = require('express-validator');
+const express = require("express");
+const { body } = require("express-validator");
 const {
   enrollInCourse,
   getMyEnrollments,
   updateProgress,
-  cancelEnrollment
-} = require('../controllers/enrollmentController');
-const { authMiddleware, authorize } = require('../middleware/auth');
-const { createLimiter } = require('../middleware/rateLimiter');
-const validate = require('../middleware/validate');
+  cancelEnrollment,
+  checkEnrollment,
+  getTutorStudents,
+} = require("../controllers/enrollmentController");
+const { authMiddleware, authorize } = require("../middleware/auth");
+const { createLimiter } = require("../middleware/rateLimiter");
+const validate = require("../middleware/validate");
 
 const router = express.Router();
 
@@ -36,15 +38,15 @@ const router = express.Router();
  *         description: Enrolled successfully
  */
 router.post(
-  '/',
+  "/",
   authMiddleware,
-  authorize('student', 'learner', 'admin'),
+  authorize("student", "learner", "admin"),
   createLimiter,
   [
-    body('courseId').isInt().withMessage('Valid course ID is required'),
-    validate
+    body("courseId").isInt().withMessage("Valid course ID is required"),
+    validate,
   ],
-  enrollInCourse
+  enrollInCourse,
 );
 
 /**
@@ -59,7 +61,32 @@ router.post(
  *       200:
  *         description: List of enrollments
  */
-router.get('/', authMiddleware, authorize('learner', 'admin'), getMyEnrollments);
+router.get(
+  "/",
+  authMiddleware,
+  authorize("student", "learner", "admin"),
+  getMyEnrollments,
+);
+
+/**
+ * @swagger
+ * /api/enrollments/check/{courseId}:
+ *   get:
+ *     tags: [Enrollments]
+ *     summary: Check if user is enrolled in a course
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Enrollment status
+ */
+router.get("/check/:courseId", authMiddleware, checkEnrollment);
 
 /**
  * @swagger
@@ -93,10 +120,10 @@ router.get('/', authMiddleware, authorize('learner', 'admin'), getMyEnrollments)
  *         description: Progress updated successfully
  */
 router.put(
-  '/:id/progress',
+  "/:id/progress",
   authMiddleware,
-  authorize('learner', 'admin'),
-  updateProgress
+  authorize("student", "learner", "admin"),
+  updateProgress,
 );
 
 /**
@@ -118,10 +145,29 @@ router.put(
  *         description: Enrollment cancelled successfully
  */
 router.put(
-  '/:id/cancel',
+  "/:id/cancel",
   authMiddleware,
-  authorize('learner', 'admin'),
-  cancelEnrollment
+  authorize("student", "learner", "admin"),
+  cancelEnrollment,
+);
+
+/**
+ * @swagger
+ * /api/enrollments/tutor/students:
+ *   get:
+ *     tags: [Enrollments]
+ *     summary: Get all students enrolled in tutor's courses
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of enrolled students with course details
+ */
+router.get(
+  "/tutor/students",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  getTutorStudents,
 );
 
 module.exports = router;

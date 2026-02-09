@@ -1,35 +1,39 @@
-const sequelize = require('../config/sequelize');
-const User = require('./User');
-const Course = require('./Course');
-const CourseContent = require('./CourseContent');
-const Enrollment = require('./Enrollment');
-const Payment = require('./Payment');
-const MarketplaceItem = require('./MarketplaceItem');
-const StudentProfile = require('./StudentProfile');
-const TutorProfile = require('./TutorProfile');
-const VendorProfile = require('./VendorProfile');
-const Order = require('./Order');
-const LiveSession = require('./LiveSession');
-const SessionEnrollment = require('./SessionEnrollment');
-const BoardingPlace = require('./BoardingPlace');
+const sequelize = require("../config/sequelize");
+const User = require("./User");
+const Course = require("./Course");
+const CourseContent = require("./CourseContent");
+const Enrollment = require("./Enrollment");
+const Payment = require("./Payment");
+const MarketplaceItem = require("./MarketplaceItem");
+const StudentProfile = require("./StudentProfile");
+const TutorProfile = require("./TutorProfile");
+const VendorProfile = require("./VendorProfile");
+const Order = require("./Order");
+const LiveSession = require("./LiveSession");
+const SessionEnrollment = require("./SessionEnrollment");
+const BoardingPlace = require("./BoardingPlace");
+const Review = require("./Review");
 
 // User - Profile relationships
-User.hasOne(StudentProfile, { foreignKey: 'userId', as: 'studentProfile' });
-StudentProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
+StudentProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-User.hasOne(TutorProfile, { foreignKey: 'userId', as: 'tutorProfile' });
-TutorProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasOne(TutorProfile, { foreignKey: "userId", as: "tutorProfile" });
+TutorProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-User.hasOne(VendorProfile, { foreignKey: 'userId', as: 'vendorProfile' });
-VendorProfile.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasOne(VendorProfile, { foreignKey: "userId", as: "vendorProfile" });
+VendorProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
 
 // TutorProfile - Admin approval relationship
-User.hasMany(TutorProfile, { foreignKey: 'approvedBy', as: 'approvedTutors' });
-TutorProfile.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver' });
+User.hasMany(TutorProfile, { foreignKey: "approvedBy", as: "approvedTutors" });
+TutorProfile.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 
 // VendorProfile - Admin approval relationship
-User.hasMany(VendorProfile, { foreignKey: 'approvedBy', as: 'approvedVendors' });
-VendorProfile.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver' });
+User.hasMany(VendorProfile, {
+  foreignKey: "approvedBy",
+  as: "approvedVendors",
+});
+VendorProfile.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 
 // User - Course relationship (Tutor creates courses)
 User.hasMany(Course, { foreignKey: "tutorId", as: "courses" });
@@ -73,37 +77,56 @@ Payment.belongsTo(MarketplaceItem, {
 });
 
 // Order relationships
-User.hasMany(Order, { foreignKey: 'buyerId', as: 'purchases' });
-Order.belongsTo(User, { foreignKey: 'buyerId', as: 'buyer' });
+User.hasMany(Order, { foreignKey: "buyerId", as: "purchases" });
+Order.belongsTo(User, { foreignKey: "buyerId", as: "buyer" });
 
-User.hasMany(Order, { foreignKey: 'sellerId', as: 'sales' });
-Order.belongsTo(User, { foreignKey: 'sellerId', as: 'seller' });
+User.hasMany(Order, { foreignKey: "sellerId", as: "sales" });
+Order.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
 
-MarketplaceItem.hasMany(Order, { foreignKey: 'itemId', as: 'orders' });
-Order.belongsTo(MarketplaceItem, { foreignKey: 'itemId', as: 'item' });
+MarketplaceItem.hasMany(Order, { foreignKey: "itemId", as: "orders" });
+Order.belongsTo(MarketplaceItem, { foreignKey: "itemId", as: "item" });
 
-Order.belongsTo(Payment, { foreignKey: 'paymentId', as: 'payment' });
-Payment.hasOne(Order, { foreignKey: 'paymentId', as: 'order' });
+Order.belongsTo(Payment, { foreignKey: "paymentId", as: "payment" });
+Payment.hasOne(Order, { foreignKey: "paymentId", as: "order" });
 
 // LiveSession relationships
-User.hasMany(LiveSession, { foreignKey: 'tutorId', as: 'liveSessions' });
-LiveSession.belongsTo(User, { foreignKey: 'tutorId', as: 'tutor' });
+User.hasMany(LiveSession, { foreignKey: "tutorId", as: "liveSessions" });
+LiveSession.belongsTo(User, { foreignKey: "tutorId", as: "tutor" });
 
-Course.hasMany(LiveSession, { foreignKey: 'courseId', as: 'liveSessions' });
-LiveSession.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
+Course.hasMany(LiveSession, { foreignKey: "courseId", as: "liveSessions" });
+LiveSession.belongsTo(Course, { foreignKey: "courseId", as: "course" });
 
-LiveSession.hasMany(SessionEnrollment, { foreignKey: 'sessionId', as: 'enrollments' });
-SessionEnrollment.belongsTo(LiveSession, { foreignKey: 'sessionId', as: 'session' });
+LiveSession.hasMany(SessionEnrollment, {
+  foreignKey: "sessionId",
+  as: "enrollments",
+});
+SessionEnrollment.belongsTo(LiveSession, {
+  foreignKey: "sessionId",
+  as: "session",
+});
 
-User.hasMany(SessionEnrollment, { foreignKey: 'studentId', as: 'sessionEnrollments' });
-SessionEnrollment.belongsTo(User, { foreignKey: 'studentId', as: 'student' });
+User.hasMany(SessionEnrollment, {
+  foreignKey: "studentId",
+  as: "sessionEnrollments",
+});
+SessionEnrollment.belongsTo(User, { foreignKey: "studentId", as: "student" });
 
-User.hasMany(SessionEnrollment, { foreignKey: 'invitedBy', as: 'sentInvitations' });
-SessionEnrollment.belongsTo(User, { foreignKey: 'invitedBy', as: 'inviter' });
+User.hasMany(SessionEnrollment, {
+  foreignKey: "invitedBy",
+  as: "sentInvitations",
+});
+SessionEnrollment.belongsTo(User, { foreignKey: "invitedBy", as: "inviter" });
 
 // User - BoardingPlace relationship (Vendor creates boarding listings)
-User.hasMany(BoardingPlace, { foreignKey: 'vendorId', as: 'boardingPlaces' });
-BoardingPlace.belongsTo(User, { foreignKey: 'vendorId', as: 'vendor' });
+User.hasMany(BoardingPlace, { foreignKey: "vendorId", as: "boardingPlaces" });
+BoardingPlace.belongsTo(User, { foreignKey: "vendorId", as: "vendor" });
+
+// Review relationships
+User.hasMany(Review, { foreignKey: "userId", as: "reviews" });
+Review.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+Course.hasMany(Review, { foreignKey: "courseId", as: "reviews" });
+Review.belongsTo(Course, { foreignKey: "courseId", as: "course" });
 
 module.exports = {
   sequelize,
@@ -119,6 +142,6 @@ module.exports = {
   Order,
   LiveSession,
   SessionEnrollment,
-  BoardingPlace
+  BoardingPlace,
+  Review,
 };
-

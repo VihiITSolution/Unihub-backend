@@ -1,9 +1,17 @@
-const express = require('express');
-const { body } = require('express-validator');
-const { register, login, getProfile, updateProfile } = require('../controllers/authController');
-const { authMiddleware } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimiter');
-const validate = require('../middleware/validate');
+const express = require("express");
+const { body } = require("express-validator");
+const {
+  register,
+  login,
+  getProfile,
+  updateProfile,
+  uploadProfilePhoto,
+  switchRole,
+} = require("../controllers/authController");
+const { authMiddleware } = require("../middleware/auth");
+const { authLimiter } = require("../middleware/rateLimiter");
+const validate = require("../middleware/validate");
+const { uploadProfileImage } = require("../config/cloudinary");
 
 const router = express.Router();
 
@@ -45,17 +53,22 @@ const router = express.Router();
  *         description: User registered successfully
  */
 router.post(
-  '/register',
+  "/register",
   authLimiter,
   [
-    body('firstName').trim().notEmpty().withMessage('First name is required'),
-    body('lastName').trim().notEmpty().withMessage('Last name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-    body('role').optional().isIn(['learner', 'tutor']).withMessage('Invalid role'),
-    validate
+    body("firstName").trim().notEmpty().withMessage("First name is required"),
+    body("lastName").trim().notEmpty().withMessage("Last name is required"),
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("password")
+      .isLength({ min: 6 })
+      .withMessage("Password must be at least 6 characters"),
+    body("role")
+      .optional()
+      .isIn(["learner", "tutor"])
+      .withMessage("Invalid role"),
+    validate,
   ],
-  register
+  register,
 );
 
 /**
@@ -85,14 +98,14 @@ router.post(
  *         description: Login successful
  */
 router.post(
-  '/login',
+  "/login",
   authLimiter,
   [
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').notEmpty().withMessage('Password is required'),
-    validate
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("password").notEmpty().withMessage("Password is required"),
+    validate,
   ],
-  login
+  login,
 );
 
 /**
@@ -107,7 +120,7 @@ router.post(
  *       200:
  *         description: User profile retrieved
  */
-router.get('/profile', authMiddleware, getProfile);
+router.get("/profile", authMiddleware, getProfile);
 
 /**
  * @swagger
@@ -137,6 +150,60 @@ router.get('/profile', authMiddleware, getProfile);
  *       200:
  *         description: Profile updated successfully
  */
-router.put('/profile', authMiddleware, updateProfile);
+router.put("/profile", authMiddleware, updateProfile);
 
+/**
+ * @swagger
+ * /api/auth/profile/photo:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Upload profile photo
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               profileImage:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Profile photo uploaded successfully
+ */
+router.post(
+  "/profile/photo",
+  authMiddleware,
+  uploadProfileImage,
+  uploadProfilePhoto,
+);
+/**
+ * @swagger
+ * /auth/switch-role:
+ *   post:
+ *     summary: Switch user's primary role
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - primaryRole
+ *             properties:
+ *               primaryRole:
+ *                 type: string
+ *                 enum: [student, tutor, vendor, admin]
+ *     responses:
+ *       200:
+ *         description: Role switched successfully
+ *       400:
+ *         description: Invalid role or user doesn't have this role
+ */
+router.post("/switch-role", authMiddleware, switchRole);
 module.exports = router;

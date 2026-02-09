@@ -45,8 +45,27 @@ const uploadVideo = multer({
   },
 }).single("video");
 
+// Storage for profile images
+const profileImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/profiles",
+    allowed_formats: ["jpg", "jpeg", "png", "gif"],
+    transformation: [{ width: 500, height: 500, crop: "limit" }],
+  },
+});
+
+// Profile image upload middleware
+const uploadProfileImage = multer({
+  storage: profileImageStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+}).single("profileImage");
+
 module.exports = {
   cloudinary,
   uploadThumbnail,
   uploadVideo,
+  uploadProfileImage,
 };

@@ -1,5 +1,5 @@
-const { User, StudentProfile, TutorProfile } = require('../models');
-const { generateToken } = require('../utils/token');
+const { User, StudentProfile, TutorProfile } = require("../models");
+const { generateToken } = require("../utils/token");
 
 /**
  * Register a new user with optional student profile
@@ -15,7 +15,7 @@ const register = async (req, res, next) => {
       primaryRole,
       phoneNumber,
       // Student profile fields
-      studentProfile
+      studentProfile,
     } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
@@ -27,7 +27,7 @@ const register = async (req, res, next) => {
     }
 
     // Determine roles - default to student if not provided
-    const userRoles = roles && roles.length > 0 ? roles : ['student'];
+    const userRoles = roles && roles.length > 0 ? roles : ["student"];
     const userPrimaryRole = primaryRole || userRoles[0];
 
     const user = await User.create({
@@ -37,11 +37,11 @@ const register = async (req, res, next) => {
       password,
       roles: userRoles,
       primaryRole: userPrimaryRole,
-      phoneNumber
+      phoneNumber,
     });
 
     // If registering as student with profile data, create student profile
-    if (userRoles.includes('student') && studentProfile) {
+    if (userRoles.includes("student") && studentProfile) {
       await StudentProfile.create({
         userId: user.id,
         universityName: studentProfile.universityName,
@@ -54,7 +54,7 @@ const register = async (req, res, next) => {
         currentAddress: studentProfile.currentAddress,
         phoneNumber: studentProfile.phoneNumber || phoneNumber,
         dateOfBirth: studentProfile.dateOfBirth,
-        isProfileComplete: true
+        isProfileComplete: true,
       });
       user.isStudentProfileComplete = true;
       await user.save();
@@ -64,9 +64,7 @@ const register = async (req, res, next) => {
 
     // Reload user with profile
     const userWithProfile = await User.findByPk(user.id, {
-      include: [
-        { model: StudentProfile, as: 'studentProfile' }
-      ]
+      include: [{ model: StudentProfile, as: "studentProfile" }],
     });
 
     res.status(201).json({
@@ -74,8 +72,8 @@ const register = async (req, res, next) => {
       message: "User registered successfully",
       data: {
         user: userWithProfile,
-        token
-      }
+        token,
+      },
     });
   } catch (error) {
     next(error);
@@ -92,9 +90,9 @@ const login = async (req, res, next) => {
     const user = await User.findOne({
       where: { email },
       include: [
-        { model: StudentProfile, as: 'studentProfile' },
-        { model: TutorProfile, as: 'tutorProfile' }
-      ]
+        { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
+      ],
     });
 
     if (!user) {
@@ -129,7 +127,7 @@ const login = async (req, res, next) => {
     const userData = user.toJSON();
     // Ensure roles are available
     if (!userData.roles) {
-      userData.roles = ['student'];
+      userData.roles = ["student"];
     }
     if (!userData.primaryRole) {
       userData.primaryRole = userData.roles[0];
@@ -155,9 +153,9 @@ const getProfile = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
       include: [
-        { model: StudentProfile, as: 'studentProfile' },
-        { model: TutorProfile, as: 'tutorProfile' }
-      ]
+        { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
+      ],
     });
 
     res.status(200).json({
@@ -195,10 +193,82 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Upload profile image
+ */
+const uploadProfilePhoto = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    user.profileImage = req.file.path; // Cloudinary URL
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile photo uploaded successfully",
+      data: {
+        profileImage: user.profileImage,
+        user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Switch user's primary role
+ */
+const switchRole = async (req, res, next) => {
+  try {
+    const { primaryRole } = req.body;
+
+    if (!primaryRole) {
+      return res.status(400).json({
+        success: false,
+        message: "Primary role is required",
+      });
+    }
+
+    const user = await User.findByPk(req.user.id, {
+      include: [
+        { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
+      ],
+    });
+
+    // Check if user has this role
+    if (!user.roles.includes(primaryRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "You don't have this role",
+      });
+    }
+
+    user.primaryRole = primaryRole;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Role switched successfully",
+      data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   getProfile,
   updateProfile,
+  uploadProfilePhoto,
+  switchRole,
 };
-
