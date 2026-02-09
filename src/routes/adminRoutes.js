@@ -44,7 +44,7 @@ const router = express.Router();
  *       200:
  *         description: List of users
  */
-router.get('/users', authMiddleware, authorize('admin'), getAllUsers);
+router.get("/users", authMiddleware, authorize("admin"), getAllUsers);
 
 /**
  * @swagger
@@ -74,7 +74,12 @@ router.get('/users', authMiddleware, authorize('admin'), getAllUsers);
  *       200:
  *         description: User status updated
  */
-router.put('/users/:id/status', authMiddleware, authorize('admin'), updateUserStatus);
+router.put(
+  "/users/:id/status",
+  authMiddleware,
+  authorize("admin"),
+  updateUserStatus,
+);
 
 /**
  * @swagger
@@ -94,7 +99,7 @@ router.put('/users/:id/status', authMiddleware, authorize('admin'), updateUserSt
  *       200:
  *         description: User deleted
  */
-router.delete('/users/:id', authMiddleware, authorize('admin'), deleteUser);
+router.delete("/users/:id", authMiddleware, authorize("admin"), deleteUser);
 
 /**
  * @swagger
@@ -108,7 +113,7 @@ router.delete('/users/:id', authMiddleware, authorize('admin'), deleteUser);
  *       200:
  *         description: Platform statistics
  */
-router.get('/statistics', authMiddleware, authorize('admin'), getStatistics);
+router.get("/statistics", authMiddleware, authorize("admin"), getStatistics);
 
 /**
  * @swagger
@@ -135,7 +140,90 @@ router.get('/statistics', authMiddleware, authorize('admin'), getStatistics);
  *       200:
  *         description: List of courses
  */
-router.get('/courses', authMiddleware, authorize('admin'), getAllCourses);
+router.get("/courses", authMiddleware, authorize("admin"), getAllCourses);
+
+/**
+ * @swagger
+ * /api/admin/courses/{id}/details:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get detailed course information (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detailed course information
+ */
+router.get(
+  "/courses/:id/details",
+  authMiddleware,
+  authorize("admin"),
+  getCourseDetails,
+);
+
+/**
+ * @swagger
+ * /api/admin/courses/{id}/approve:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Approve a course (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Course approved successfully
+ */
+router.put(
+  "/courses/:id/approve",
+  authMiddleware,
+  authorize("admin"),
+  approveCourse,
+);
+
+/**
+ * @swagger
+ * /api/admin/courses/{id}/reject:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Reject a course (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Course rejected
+ */
+router.put(
+  "/courses/:id/reject",
+  authMiddleware,
+  authorize("admin"),
+  rejectCourse,
+);
 
 /**
  * @swagger
@@ -162,7 +250,12 @@ router.get('/courses', authMiddleware, authorize('admin'), getAllCourses);
  *       200:
  *         description: List of marketplace items
  */
-router.get('/marketplace', authMiddleware, authorize('admin'), getAllMarketplaceItems);
+router.get(
+  "/marketplace",
+  authMiddleware,
+  authorize("admin"),
+  getAllMarketplaceItems,
+);
 
 /**
  * @swagger

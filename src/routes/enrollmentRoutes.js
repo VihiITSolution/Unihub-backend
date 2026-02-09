@@ -64,7 +64,7 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  authorize("student", "learner", "admin"),
+  authorize("student", "admin"),
   getMyEnrollments,
 );
 
@@ -122,7 +122,7 @@ router.get("/check/:courseId", authMiddleware, checkEnrollment);
 router.put(
   "/:id/progress",
   authMiddleware,
-  authorize("student", "learner", "admin"),
+  authorize("student", "admin"),
   updateProgress,
 );
 
@@ -147,7 +147,7 @@ router.put(
 router.put(
   "/:id/cancel",
   authMiddleware,
-  authorize("student", "learner", "admin"),
+  authorize("student", "admin"),
   cancelEnrollment,
 );
 

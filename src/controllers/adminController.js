@@ -7,19 +7,19 @@ const { Op } = require('sequelize');
 const getAllUsers = async (req, res, next) => {
   try {
     const { role, isActive, page = 1, limit = 10 } = req.query;
-    
+
     const where = {};
     if (role) where.primaryRole = role;
     if (isActive !== undefined) where.isActive = isActive === 'true';
 
     const offset = (page - 1) * limit;
-    
+
     const { count, rows: users } = await User.findAndCountAll({
       where,
-      attributes: { exclude: ['password'] },
+      attributes: { exclude: ["password"] },
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createdAt', 'DESC']]
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
@@ -30,9 +30,9 @@ const getAllUsers = async (req, res, next) => {
           total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
-      }
+          totalPages: Math.ceil(count / limit),
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -48,11 +48,11 @@ const updateUserStatus = async (req, res, next) => {
     const { isActive, isVerified } = req.body;
 
     const user = await User.findByPk(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -63,8 +63,8 @@ const updateUserStatus = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'User status updated successfully',
-      data: { user }
+      message: "User status updated successfully",
+      data: { user },
     });
   } catch (error) {
     next(error);
@@ -81,16 +81,16 @@ const deleteUser = async (req, res, next) => {
     if (parseInt(id) === req.user.id) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot delete your own account'
+        message: "Cannot delete your own account",
       });
     }
 
     const user = await User.findByPk(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -98,7 +98,7 @@ const deleteUser = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'User deleted successfully'
+      message: "User deleted successfully",
     });
   } catch (error) {
     next(error);
@@ -155,21 +155,21 @@ const getStatistics = async (req, res, next) => {
         users: {
           total: totalUsers,
           tutors: totalTutors,
-          learners: totalLearners
+          learners: totalLearners,
         },
         courses: {
           total: totalCourses,
-          published: publishedCourses
+          published: publishedCourses,
         },
         enrollments: totalEnrollments,
         payments: {
           total: totalPayments,
-          revenue: totalRevenue || 0
+          revenue: totalRevenue || 0,
         },
         marketplace: {
-          totalItems: totalMarketplaceItems
-        }
-      }
+          totalItems: totalMarketplaceItems,
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -182,22 +182,24 @@ const getStatistics = async (req, res, next) => {
 const getAllCourses = async (req, res, next) => {
   try {
     const { isPublished, page = 1, limit = 10 } = req.query;
-    
+
     const where = {};
-    if (isPublished !== undefined) where.isPublished = isPublished === 'true';
+    if (isPublished !== undefined) where.isPublished = isPublished === "true";
 
     const offset = (page - 1) * limit;
-    
+
     const { count, rows: courses } = await Course.findAndCountAll({
       where,
-      include: [{
-        model: User,
-        as: 'tutor',
-        attributes: ['id', 'firstName', 'lastName', 'email']
-      }],
+      include: [
+        {
+          model: User,
+          as: "tutor",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createdAt', 'DESC']]
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
@@ -208,9 +210,9 @@ const getAllCourses = async (req, res, next) => {
           total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
-      }
+          totalPages: Math.ceil(count / limit),
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -223,22 +225,24 @@ const getAllCourses = async (req, res, next) => {
 const getAllMarketplaceItems = async (req, res, next) => {
   try {
     const { isAvailable, page = 1, limit = 10 } = req.query;
-    
+
     const where = {};
-    if (isAvailable !== undefined) where.isAvailable = isAvailable === 'true';
+    if (isAvailable !== undefined) where.isAvailable = isAvailable === "true";
 
     const offset = (page - 1) * limit;
-    
+
     const { count, rows: items } = await MarketplaceItem.findAndCountAll({
       where,
-      include: [{
-        model: User,
-        as: 'seller',
-        attributes: ['id', 'firstName', 'lastName', 'email']
-      }],
+      include: [
+        {
+          model: User,
+          as: "seller",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createdAt', 'DESC']]
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
@@ -249,9 +253,153 @@ const getAllMarketplaceItems = async (req, res, next) => {
           total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
-      }
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get detailed course info for admin review
+ */
+const getCourseDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const course = await Course.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: "tutor",
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "email",
+            "profileImage",
+            "createdAt",
+          ],
+          include: [
+            {
+              model: TutorProfile,
+              as: "tutorProfile",
+              attributes: [
+                "id",
+                "userId",
+                "qualifications",
+                "expertiseAreas",
+                "bio",
+                "yearsOfExperience",
+                "isApproved",
+                "approvalStatus",
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
+    // Get course contents
+    const courseContent = await CourseContent.findAll({
+      where: { courseId: id },
+      order: [["order", "ASC"]],
+    });
+
+    // Get enrollment stats
+    const enrollmentCount = await Enrollment.count({
+      where: { courseId: id },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        course: {
+          ...course.toJSON(),
+          enrollmentCount,
+        },
+        courseContent,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approve a course (Admin only)
+ */
+const approveCourse = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const course = await Course.findByPk(id);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
+    course.isPublished = true;
+    course.approvalStatus = "approved";
+    course.approvedBy = req.user.id;
+    course.approvedAt = new Date();
+    await course.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Course approved successfully",
+      data: { course },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject a course (Admin only)
+ */
+const rejectCourse = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejection reason is required",
+      });
+    }
+
+    const course = await Course.findByPk(id);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
+    course.isPublished = false;
+    course.approvalStatus = "rejected";
+    course.rejectionReason = reason;
+    await course.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Course rejected",
+      data: { course },
     });
   } catch (error) {
     next(error);

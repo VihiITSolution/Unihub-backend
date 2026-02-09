@@ -45,7 +45,7 @@ const router = express.Router();
  *                 format: password
  *               role:
  *                 type: string
- *                 enum: [learner, tutor]
+ *                 enum: [student, tutor]
  *               phoneNumber:
  *                 type: string
  *     responses:
@@ -64,7 +64,7 @@ router.post(
       .withMessage("Password must be at least 6 characters"),
     body("role")
       .optional()
-      .isIn(["learner", "tutor"])
+      .isIn(["student", "tutor"])
       .withMessage("Invalid role"),
     validate,
   ],

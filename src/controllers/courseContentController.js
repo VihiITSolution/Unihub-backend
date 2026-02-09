@@ -1,6 +1,7 @@
 const { CourseContent, Enrollment } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const path = require("path");
+const fs = require("fs");
 
 /**
  * Add content to a course (video lesson or PDF)
