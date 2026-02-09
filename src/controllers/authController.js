@@ -228,6 +228,7 @@ const uploadProfilePhoto = async (req, res, next) => {
 const switchRole = async (req, res, next) => {
   try {
     const { primaryRole } = req.body;
+    const userId = req.user.id;
 
     if (!primaryRole) {
       return res.status(400).json({
@@ -236,21 +237,30 @@ const switchRole = async (req, res, next) => {
       });
     }
 
-    const user = await User.findByPk(req.user.id, {
+    // Get user with profiles
+    const user = await User.findByPk(userId, {
       include: [
         { model: StudentProfile, as: "studentProfile" },
         { model: TutorProfile, as: "tutorProfile" },
       ],
     });
 
-    // Check if user has this role
-    if (!user.roles.includes(primaryRole)) {
-      return res.status(400).json({
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: "You don't have this role",
+        message: "User not found",
       });
     }
 
+    // Check if user has the requested role
+    if (!user.roles || !user.roles.includes(primaryRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "You don't have access to this role",
+      });
+    }
+
+    // Update primary role
     user.primaryRole = primaryRole;
     await user.save();
 

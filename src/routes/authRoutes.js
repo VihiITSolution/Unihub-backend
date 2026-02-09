@@ -179,12 +179,13 @@ router.post(
   uploadProfileImage,
   uploadProfilePhoto,
 );
+
 /**
  * @swagger
- * /auth/switch-role:
+ * /api/auth/switch-role:
  *   post:
+ *     tags: [Authentication]
  *     summary: Switch user's primary role
- *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -199,11 +200,15 @@ router.post(
  *               primaryRole:
  *                 type: string
  *                 enum: [student, tutor, vendor, admin]
+ *                 description: The role to switch to
  *     responses:
  *       200:
  *         description: Role switched successfully
  *       400:
  *         description: Invalid role or user doesn't have this role
+ *       401:
+ *         description: Unauthorized
  */
 router.post("/switch-role", authMiddleware, switchRole);
+
 module.exports = router;
