@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const app = require('./app');
 const { sequelize } = require('./models');
 
@@ -9,14 +10,21 @@ const startServer = async () => {
   try {
     // Test database connection
     await sequelize.authenticate();
+
     console.log('✓ Database connection has been established successfully.');
 
     // Sync models with database (creates tables if they don't exist)
     // In production, use migrations instead
     if (process.env.NODE_ENV !== 'production') {
-      await sequelize.sync({ alter: false });
-      console.log('✓ Database models synchronized.');
+      try {
+        await sequelize.sync({ alter: true });
+        console.log('✓ Database models synchronized.');
+      } catch (syncError) {
+        console.error('⚠ Database synchronization failed:', syncError.message);
+        console.log('Continuing server startup without synchronization...');
+      }
     }
+
 
     // Start server
     app.listen(PORT, () => {

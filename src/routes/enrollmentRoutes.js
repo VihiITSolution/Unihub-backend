@@ -1,14 +1,14 @@
-const express = require("express");
-const { body } = require("express-validator");
+const express = require('express');
+const { body } = require('express-validator');
 const {
   enrollInCourse,
   getMyEnrollments,
   updateProgress,
-  cancelEnrollment,
-} = require("../controllers/enrollmentController");
-const { authMiddleware, authorize } = require("../middleware/auth");
-const { createLimiter } = require("../middleware/rateLimiter");
-const validate = require("../middleware/validate");
+  cancelEnrollment
+} = require('../controllers/enrollmentController');
+const { authMiddleware, authorize } = require('../middleware/auth');
+const { createLimiter } = require('../middleware/rateLimiter');
+const validate = require('../middleware/validate');
 
 const router = express.Router();
 
@@ -38,7 +38,7 @@ const router = express.Router();
 router.post(
   "/",
   authMiddleware,
-  authorize("student", "admin"),
+  authorize('student', 'learner', 'admin'),
   createLimiter,
   [
     body("courseId").isInt().withMessage("Valid course ID is required"),

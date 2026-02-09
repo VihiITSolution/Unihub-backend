@@ -1,16 +1,17 @@
-const express = require("express");
-const {
-  getAllUsers,
-  updateUserStatus,
-  deleteUser,
-  getStatistics,
-  getAllCourses,
+const express = require('express');
+const { 
+  getAllUsers, 
+  updateUserStatus, 
+  deleteUser, 
+  getStatistics, 
+  getAllCourses, 
   getAllMarketplaceItems,
-  getCourseDetails,
+  getPendingCourses,
   approveCourse,
   rejectCourse,
-} = require("../controllers/adminController");
-const { authMiddleware, authorize } = require("../middleware/auth");
+  getCourseDetails
+} = require('../controllers/adminController');
+const { authMiddleware, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -255,5 +256,89 @@ router.get(
   authorize("admin"),
   getAllMarketplaceItems,
 );
+
+/**
+ * @swagger
+ * /api/admin/courses/pending:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get courses pending approval (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of pending courses
+ */
+router.get('/courses/pending', authMiddleware, authorize('admin'), getPendingCourses);
+
+/**
+ * @swagger
+ * /api/admin/courses/{id}/approve:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Approve a course (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Course approved
+ */
+router.put('/courses/:id/approve', authMiddleware, authorize('admin'), approveCourse);
+
+/**
+ * @swagger
+ * /api/admin/courses/{id}/reject:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Reject a course (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Course rejected
+ */
+router.put('/courses/:id/reject', authMiddleware, authorize('admin'), rejectCourse);
+
+/**
+ * @swagger
+ * /api/admin/courses/{id}/details:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get detailed course info for review (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Course details with tutor profile
+ */
+router.get('/courses/:id/details', authMiddleware, authorize('admin'), getCourseDetails);
 
 module.exports = router;
