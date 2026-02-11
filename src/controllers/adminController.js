@@ -1,5 +1,13 @@
-const { User, Course, Enrollment, Payment, MarketplaceItem, TutorProfile, CourseContent } = require('../models');
-const { Op } = require('sequelize');
+const {
+  User,
+  Course,
+  Enrollment,
+  Payment,
+  MarketplaceItem,
+  TutorProfile,
+  CourseContent,
+} = require("../models");
+const { Op } = require("sequelize");
 
 /**
  * Get all users (Admin only)
@@ -10,7 +18,7 @@ const getAllUsers = async (req, res, next) => {
 
     const where = {};
     if (role) where.primaryRole = role;
-    if (isActive !== undefined) where.isActive = isActive === 'true';
+    if (isActive !== undefined) where.isActive = isActive === "true";
 
     const offset = (page - 1) * limit;
 
@@ -111,43 +119,49 @@ const deleteUser = async (req, res, next) => {
 const getStatistics = async (req, res, next) => {
   try {
     const totalUsers = await User.count();
-    
+
     // Count tutors - use primaryRole field
-    const totalTutors = await User.count({ 
-      where: { primaryRole: 'tutor' } 
+    const totalTutors = await User.count({
+      where: { primaryRole: "tutor" },
     });
-    
+
     // Count learners/students
-    const totalLearners = await User.count({ 
-      where: { 
-        [Op.or]: [
-          { primaryRole: 'learner' },
-          { primaryRole: 'student' }
-        ]
-      } 
+    const totalLearners = await User.count({
+      where: {
+        [Op.or]: [{ primaryRole: "learner" }, { primaryRole: "student" }],
+      },
     });
-    
+
     const totalCourses = await Course.count();
-    const publishedCourses = await Course.count({ where: { isPublished: true } });
-    
+    const publishedCourses = await Course.count({
+      where: { isPublished: true },
+    });
+
     // These might fail if tables don't exist, wrap in try-catch
     let totalEnrollments = 0;
     let totalPayments = 0;
     let totalRevenue = 0;
     let totalMarketplaceItems = 0;
-    
+
     try {
       totalEnrollments = await Enrollment.count();
-    } catch (e) { /* table might not exist */ }
-    
+    } catch (e) {
+      /* table might not exist */
+    }
+
     try {
       totalPayments = await Payment.count();
-      totalRevenue = await Payment.sum('amount', { where: { status: 'completed' } }) || 0;
-    } catch (e) { /* table might not exist */ }
-    
+      totalRevenue =
+        (await Payment.sum("amount", { where: { status: "completed" } })) || 0;
+    } catch (e) {
+      /* table might not exist */
+    }
+
     try {
       totalMarketplaceItems = await MarketplaceItem.count();
-    } catch (e) { /* table might not exist */ }
+    } catch (e) {
+      /* table might not exist */
+    }
 
     res.status(200).json({
       success: true,
@@ -336,77 +350,6 @@ const getCourseDetails = async (req, res, next) => {
 };
 
 /**
- * Approve a course (Admin only)
- */
-const approveCourse = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const course = await Course.findByPk(id);
-
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
-    }
-
-    course.isPublished = true;
-    course.approvalStatus = "approved";
-    course.approvedBy = req.user.id;
-    course.approvedAt = new Date();
-    await course.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Course approved successfully",
-      data: { course },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Reject a course (Admin only)
- */
-const rejectCourse = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Rejection reason is required",
-      });
-    }
-
-    const course = await Course.findByPk(id);
-
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
-    }
-
-    course.isPublished = false;
-    course.approvalStatus = "rejected";
-    course.rejectionReason = reason;
-    await course.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Course rejected",
-      data: { course },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * Get courses pending approval (Admin only)
  */
 const getPendingCourses = async (req, res, next) => {
@@ -415,15 +358,17 @@ const getPendingCourses = async (req, res, next) => {
     const offset = (page - 1) * limit;
 
     const { count, rows: courses } = await Course.findAndCountAll({
-      where: { approvalStatus: 'pending' },
-      include: [{
-        model: User,
-        as: 'tutor',
-        attributes: ['id', 'firstName', 'lastName', 'email']
-      }],
+      where: { approvalStatus: ["draft", "pending"] },
+      include: [
+        {
+          model: User,
+          as: "tutor",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['submittedForReviewAt', 'ASC']]
+      order: [["createdAt", "ASC"]],
     });
 
     res.status(200).json({
@@ -434,9 +379,9 @@ const getPendingCourses = async (req, res, next) => {
           total: count,
           page: parseInt(page),
           limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit)
-        }
-      }
+          totalPages: Math.ceil(count / limit),
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -449,24 +394,27 @@ const getPendingCourses = async (req, res, next) => {
 const approveCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
     const course = await Course.findByPk(id);
-    
+
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: 'Course not found'
+        message: "Course not found",
       });
     }
 
-    if (course.approvalStatus !== 'pending') {
+    if (
+      course.approvalStatus !== "pending" &&
+      course.approvalStatus !== "draft"
+    ) {
       return res.status(400).json({
         success: false,
-        message: `Cannot approve course with status: ${course.approvalStatus}`
+        message: `Cannot approve course with status: ${course.approvalStatus}`,
       });
     }
 
-    course.approvalStatus = 'approved';
+    course.approvalStatus = "approved";
     course.isPublished = true;
     course.approvedBy = req.user.id;
     course.approvedAt = new Date();
@@ -476,8 +424,8 @@ const approveCourse = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Course approved and published successfully',
-      data: { course }
+      message: "Course approved and published successfully",
+      data: { course },
     });
   } catch (error) {
     next(error);
@@ -495,27 +443,30 @@ const rejectCourse = async (req, res, next) => {
     if (!reason) {
       return res.status(400).json({
         success: false,
-        message: 'Rejection reason is required'
+        message: "Rejection reason is required",
       });
     }
 
     const course = await Course.findByPk(id);
-    
+
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: 'Course not found'
+        message: "Course not found",
       });
     }
 
-    if (course.approvalStatus !== 'pending' && course.approvalStatus !== 'approved') {
+    if (
+      course.approvalStatus !== "pending" &&
+      course.approvalStatus !== "approved"
+    ) {
       return res.status(400).json({
         success: false,
-        message: `Cannot reject course with status: ${course.approvalStatus}`
+        message: `Cannot reject course with status: ${course.approvalStatus}`,
       });
     }
 
-    course.approvalStatus = 'rejected';
+    course.approvalStatus = "rejected";
     course.isPublished = false;
     course.approvedBy = req.user.id;
     course.approvedAt = new Date();
@@ -525,60 +476,8 @@ const rejectCourse = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Course rejected',
-      data: { course }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Get detailed course info for review (Admin only)
- * Includes tutor profile with qualifications
- */
-const getCourseDetails = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const course = await Course.findByPk(id, {
-      include: [
-        {
-          model: User,
-          as: 'tutor',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'bio', 'profileImage', 'createdAt'],
-          include: [{
-            model: TutorProfile,
-            as: 'tutorProfile'
-          }]
-        }
-      ]
-    });
-
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: 'Course not found'
-      });
-    }
-
-    // Get course content/sections
-    let courseContent = [];
-    try {
-      courseContent = await CourseContent.findAll({
-        where: { courseId: id },
-        order: [['order', 'ASC']]
-      });
-    } catch (e) {
-      // CourseContent table might not exist
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        course,
-        courseContent
-      }
+      message: "Course rejected",
+      data: { course },
     });
   } catch (error) {
     next(error);
@@ -595,5 +494,5 @@ module.exports = {
   getPendingCourses,
   approveCourse,
   rejectCourse,
-  getCourseDetails
+  getCourseDetails,
 };

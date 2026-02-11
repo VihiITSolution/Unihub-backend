@@ -39,6 +39,10 @@ VendorProfile.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 User.hasMany(Course, { foreignKey: "tutorId", as: "courses" });
 Course.belongsTo(User, { foreignKey: "tutorId", as: "tutor" });
 
+// Course - Admin approval relationship
+User.hasMany(Course, { foreignKey: "approvedBy", as: "approvedCourses" });
+Course.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
+
 // Course - CourseContent relationship
 Course.hasMany(CourseContent, { foreignKey: "courseId", as: "contents" });
 CourseContent.belongsTo(Course, { foreignKey: "courseId", as: "course" });

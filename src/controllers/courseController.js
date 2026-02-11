@@ -142,8 +142,8 @@ const getCourseById = async (req, res, next) => {
       const enrollment = await Enrollment.findOne({
         where: {
           courseId: id,
-          learnerId: req.user.id
-        }
+          learnerId: req.user.id,
+        },
       });
       isEnrolled = !!enrollment;
     }
@@ -254,11 +254,20 @@ const deleteCourse = async (req, res, next) => {
 
 /**
  * Get courses by tutor (my courses)
+ * Includes approval status, rejection reason, and admin details
  */
 const getMyCourses = async (req, res, next) => {
   try {
     const courses = await Course.findAll({
       where: { tutorId: req.user.id },
+      include: [
+        {
+          model: User,
+          as: "approver",
+          attributes: ["id", "firstName", "lastName", "email"],
+          required: false,
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
 
@@ -295,14 +304,17 @@ const submitForReview = async (req, res, next) => {
     }
 
     // Only allow submitting draft or rejected courses
-    if (course.approvalStatus !== 'draft' && course.approvalStatus !== 'rejected') {
+    if (
+      course.approvalStatus !== "draft" &&
+      course.approvalStatus !== "rejected"
+    ) {
       return res.status(400).json({
         success: false,
         message: `Cannot submit course with status: ${course.approvalStatus}`,
       });
     }
 
-    course.approvalStatus = 'pending';
+    course.approvalStatus = "pending";
     course.submittedForReviewAt = new Date();
     course.rejectionReason = null; // Clear previous rejection reason
 

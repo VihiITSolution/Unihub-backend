@@ -47,7 +47,7 @@ class YouTubeUploader {
 
       if (!client_id || !client_secret) {
         console.error(
-          "Invalid YouTube credentials format. Missing client_id or client_secret."
+          "Invalid YouTube credentials format. Missing client_id or client_secret.",
         );
         this.initialized = false;
         return false;
@@ -55,18 +55,13 @@ class YouTubeUploader {
 
       // Use redirect_uris if available, otherwise use default
       const redirectUri =
-        redirect_uris && redirect_uris[0]
-          ? redirect_uris[0]
-          : "http://localhost:3000/api/youtube/oauth2callback";
-
-      const redirectUri =
         (redirect_uris && redirect_uris[0]) ||
         "http://localhost:5000/api/youtube/oauth2callback";
 
       this.oauth2Client = new google.auth.OAuth2(
         client_id,
         client_secret,
-        redirectUri
+        redirectUri,
       );
 
       // Check if token exists
@@ -152,7 +147,7 @@ class YouTubeUploader {
     const scopes = [
       "https://www.googleapis.com/auth/youtube.upload",
       "https://www.googleapis.com/auth/youtube",
-      "https://www.googleapis.com/auth/youtube.force-ssl"
+      "https://www.googleapis.com/auth/youtube.force-ssl",
     ];
 
     const url = this.oauth2Client.generateAuthUrl({
@@ -193,7 +188,7 @@ class YouTubeUploader {
    */
   async createLiveBroadcast(broadcastData) {
     if (!this.initialized) {
-      throw new Error('YouTube API not initialized');
+      throw new Error("YouTube API not initialized");
     }
 
     const {
@@ -201,17 +196,17 @@ class YouTubeUploader {
       description,
       scheduledStartTime,
       scheduledEndTime,
-      privacyStatus = 'unlisted', // unlisted, private, or public
+      privacyStatus = "unlisted", // unlisted, private, or public
       enableChat = true,
       enableDvr = true,
       enableAutoStart = true,
-      enableAutoStop = true
+      enableAutoStop = true,
     } = broadcastData;
 
     try {
       // Create the broadcast
       const broadcastResponse = await this.youtube.liveBroadcasts.insert({
-        part: ['snippet', 'contentDetails', 'status'],
+        part: ["snippet", "contentDetails", "status"],
         requestBody: {
           snippet: {
             title,
@@ -225,42 +220,42 @@ class YouTubeUploader {
             enableAutoStop,
             enableClosedCaptions: false,
             recordFromStart: true,
-            startWithSlate: false
+            startWithSlate: false,
           },
           status: {
             privacyStatus,
-            selfDeclaredMadeForKids: false
-          }
-        }
+            selfDeclaredMadeForKids: false,
+          },
+        },
       });
 
       const broadcast = broadcastResponse.data;
 
       // Create the live stream
       const streamResponse = await this.youtube.liveStreams.insert({
-        part: ['snippet', 'cdn', 'contentDetails', 'status'],
+        part: ["snippet", "cdn", "contentDetails", "status"],
         requestBody: {
           snippet: {
-            title: `Stream for: ${title}`
+            title: `Stream for: ${title}`,
           },
           cdn: {
-            frameRate: 'variable',
-            ingestionType: 'rtmp',
-            resolution: 'variable'
+            frameRate: "variable",
+            ingestionType: "rtmp",
+            resolution: "variable",
           },
           contentDetails: {
-            isReusable: false
-          }
-        }
+            isReusable: false,
+          },
+        },
       });
 
       const stream = streamResponse.data;
 
       // Bind broadcast to stream
       await this.youtube.liveBroadcasts.bind({
-        part: ['id', 'contentDetails'],
+        part: ["id", "contentDetails"],
         id: broadcast.id,
-        streamId: stream.id
+        streamId: stream.id,
       });
 
       return {
@@ -273,10 +268,10 @@ class YouTubeUploader {
         embedUrl: `https://www.youtube-nocookie.com/embed/${broadcast.id}`,
         chatUrl: `https://www.youtube.com/live_chat?v=${broadcast.id}`,
         status: broadcast.status.lifeCycleStatus,
-        privacyStatus: broadcast.status.privacyStatus
+        privacyStatus: broadcast.status.privacyStatus,
       };
     } catch (error) {
-      console.error('Failed to create YouTube Live broadcast:', error.message);
+      console.error("Failed to create YouTube Live broadcast:", error.message);
       throw error;
     }
   }
@@ -287,19 +282,19 @@ class YouTubeUploader {
    */
   async startBroadcast(broadcastId) {
     if (!this.initialized) {
-      throw new Error('YouTube API not initialized');
+      throw new Error("YouTube API not initialized");
     }
 
     try {
       const response = await this.youtube.liveBroadcasts.transition({
-        broadcastStatus: 'live',
+        broadcastStatus: "live",
         id: broadcastId,
-        part: ['status']
+        part: ["status"],
       });
 
       return response.data;
     } catch (error) {
-      console.error('Failed to start broadcast:', error.message);
+      console.error("Failed to start broadcast:", error.message);
       throw error;
     }
   }
@@ -310,19 +305,19 @@ class YouTubeUploader {
    */
   async endBroadcast(broadcastId) {
     if (!this.initialized) {
-      throw new Error('YouTube API not initialized');
+      throw new Error("YouTube API not initialized");
     }
 
     try {
       const response = await this.youtube.liveBroadcasts.transition({
-        broadcastStatus: 'complete',
+        broadcastStatus: "complete",
         id: broadcastId,
-        part: ['status']
+        part: ["status"],
       });
 
       return response.data;
     } catch (error) {
-      console.error('Failed to end broadcast:', error.message);
+      console.error("Failed to end broadcast:", error.message);
       throw error;
     }
   }
@@ -333,13 +328,13 @@ class YouTubeUploader {
    */
   async getBroadcastStatus(broadcastId) {
     if (!this.initialized) {
-      throw new Error('YouTube API not initialized');
+      throw new Error("YouTube API not initialized");
     }
 
     try {
       const response = await this.youtube.liveBroadcasts.list({
-        part: ['status', 'snippet'],
-        id: broadcastId
+        part: ["status", "snippet"],
+        id: broadcastId,
       });
 
       if (response.data.items && response.data.items.length > 0) {
@@ -348,7 +343,7 @@ class YouTubeUploader {
 
       return null;
     } catch (error) {
-      console.error('Failed to get broadcast status:', error.message);
+      console.error("Failed to get broadcast status:", error.message);
       throw error;
     }
   }
