@@ -10,10 +10,36 @@ module.exports = {
     dialect: 'mysql',
     logging: false,
     pool: {
-      max: 5,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
+      max: 10,              // Increased for better concurrency
+      min: 2,               // Keep minimum connections alive
+      acquire: 60000,       // Increased to 60s for remote DB
+      idle: 20000,          // Keep connections alive longer
+      evict: 30000          // Remove stale connections after 30s
+    },
+    dialectOptions: {
+      connectTimeout: 30000,        // 30s connection timeout
+      requestTimeout: 60000,        // 60s query timeout
+      socketPath: undefined,
+      supportBigNumbers: true,
+      bigNumberStrings: true,
+      dateStrings: false,
+      keepAlive: true,              // Enable TCP keep-alive
+      keepAliveInitialDelay: 10000  // 10s initial delay
+    },
+    retry: {
+      max: 3,                       // Retry failed connections 3 times
+      match: [
+        /SequelizeConnectionError/,
+        /SequelizeConnectionRefusedError/,
+        /SequelizeHostNotFoundError/,
+        /SequelizeHostNotReachableError/,
+        /SequelizeInvalidConnectionError/,
+        /SequelizeConnectionTimedOutError/,
+        /ECONNRESET/,
+        /ECONNREFUSED/,
+        /ETIMEDOUT/,
+        /ER_NET_READ_INTERRUPTED/
+      ]
     }
   },
   test: {
@@ -34,10 +60,36 @@ module.exports = {
     dialect: 'mysql',
     logging: false,
     pool: {
-      max: 10,
-      min: 0,
-      acquire: 30000,
-      idle: 10000
+      max: 20,              // Higher for production load
+      min: 5,               // Maintain minimum pool
+      acquire: 60000,       // 60s acquire timeout
+      idle: 20000,          // Keep connections alive
+      evict: 30000          // Evict stale connections
+    },
+    dialectOptions: {
+      connectTimeout: 30000,
+      requestTimeout: 60000,
+      socketPath: undefined,
+      supportBigNumbers: true,
+      bigNumberStrings: true,
+      dateStrings: false,
+      keepAlive: true,
+      keepAliveInitialDelay: 10000
+    },
+    retry: {
+      max: 5,               // More retries in production
+      match: [
+        /SequelizeConnectionError/,
+        /SequelizeConnectionRefusedError/,
+        /SequelizeHostNotFoundError/,
+        /SequelizeHostNotReachableError/,
+        /SequelizeInvalidConnectionError/,
+        /SequelizeConnectionTimedOutError/,
+        /ECONNRESET/,
+        /ECONNREFUSED/,
+        /ETIMEDOUT/,
+        /ER_NET_READ_INTERRUPTED/
+      ]
     }
   }
 };
