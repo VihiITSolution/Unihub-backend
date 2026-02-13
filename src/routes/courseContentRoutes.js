@@ -10,6 +10,7 @@ const {
 const { authMiddleware, authorize } = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { uploadVideo } = require("../config/upload");
+const { uploadPDF } = require("../config/cloudinary");
 
 const router = express.Router();
 
@@ -18,7 +19,15 @@ router.post(
   "/courses/:courseId/content",
   authMiddleware,
   authorize("tutor", "admin"),
-  uploadVideo,
+  (req, res, next) => {
+    // Use appropriate upload middleware based on type
+    const type = req.body.type || req.query.type;
+    if (type === "pdf") {
+      uploadPDF(req, res, next);
+    } else {
+      uploadVideo(req, res, next);
+    }
+  },
   [
     body("title").trim().notEmpty().withMessage("Title is required"),
     body("type")

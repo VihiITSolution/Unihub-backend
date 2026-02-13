@@ -1,6 +1,15 @@
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, "../../uploads");
@@ -39,7 +48,7 @@ const videoStorage = multer.diskStorage({
 const thumbnailFilter = function (req, file, cb) {
   const allowedTypes = /jpeg|jpg|png/;
   const extname = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase()
+    path.extname(file.originalname).toLowerCase(),
   );
   const mimetype = allowedTypes.test(file.mimetype);
 
@@ -54,7 +63,7 @@ const thumbnailFilter = function (req, file, cb) {
 const videoFilter = function (req, file, cb) {
   const allowedTypes = /mp4|avi|mov|wmv|flv|mkv/;
   const extname = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase()
+    path.extname(file.originalname).toLowerCase(),
   );
   const mimetype = file.mimetype.startsWith("video/");
 
@@ -83,9 +92,57 @@ const uploadVideo = multer({
   },
 }).single("video");
 
+// File filter for course content (videos and PDFs)
+const courseContentFilter = function (req, file, cb) {
+  const allowedVideoTypes = /mp4|avi|mov|wmv|flv|mkv/;
+  const allowedPdfType = /pdf/;
+  const extname = path.extname(file.originalname).toLowerCase();
+
+  const isVideo =
+    allowedVideoTypes.test(extname.slice(1)) &&
+    file.mimetype.startsWith("video/");
+  const isPdf =
+    allowedPdfType.test(extname.slice(1)) &&
+    file.mimetype === "application/pdf";
+
+  if (isVideo || isPdf) {
+    return cb(null, true);
+  } else {
+    cb(
+      new Error(
+        "Only video files (MP4, AVI, MOV, WMV) and PDF documents are allowed!",
+      ),
+    );
+  }
+};
+
+// Cloudinary storage for course content (videos and PDFs)
+const courseContentStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    const isPdf = file.mimetype === "application/pdf";
+    return {
+      folder: isPdf ? "unihub/course-pdfs" : "unihub/course-videos",
+      resource_type: isPdf ? "raw" : "video",
+      allowed_formats: isPdf ? ["pdf"] : ["mp4", "mov", "avi", "wmv"],
+      public_id: `${Date.now()}-${file.originalname.split(".")[0]}`,
+    };
+  },
+});
+
+// Course content upload middleware (videos and PDFs)
+const uploadCourseContent = multer({
+  storage: courseContentStorage,
+  fileFilter: courseContentFilter,
+  limits: {
+    fileSize: 500 * 1024 * 1024, // 500MB max
+  },
+}).single("video");
+
 module.exports = {
   uploadThumbnail,
   uploadVideo,
+  uploadCourseContent,
   thumbnailsDir,
   videosDir,
 };

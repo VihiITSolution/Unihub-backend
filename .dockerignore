@@ -1,0 +1,43 @@
+# Ignore node modules
+node_modules
+npm-debug.log
+
+# Ignore local environment files
+.env.local
+.env.development
+.env.test
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore documentation
+*.md
+!README.md
+
+# Ignore test files
+test
+tests
+__tests__
+*.test.js
+*.spec.js
+
+# Ignore uploads (videos should be on YouTube)
+uploads/*
+
+# Ignore development files
+.vscode
+.idea
+*.log
+
+# Ignore unnecessary files
+.DS_Store
+Thumbs.db
+
+# Ignore scripts
+test-*.js
+check-*.js
+clear-*.js
+setup-youtube.js
+authorize-youtube.js
+seed_error.txt

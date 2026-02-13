@@ -68,12 +68,44 @@ class YouTubeUploader {
       if (fs.existsSync(tokenPath)) {
         const token = JSON.parse(fs.readFileSync(tokenPath, "utf8"));
         this.oauth2Client.setCredentials(token);
+
+        // Set up automatic token refresh
+        this.oauth2Client.on("tokens", (tokens) => {
+          if (tokens.refresh_token) {
+            // Store the refresh token
+            console.log("Received new refresh token");
+          }
+          if (tokens.access_token) {
+            console.log("Access token refreshed");
+            // Update the token file
+            const updatedToken = {
+              ...token,
+              access_token: tokens.access_token,
+              expiry_date: tokens.expiry_date,
+            };
+            fs.writeFileSync(tokenPath, JSON.stringify(updatedToken, null, 2));
+          }
+        });
+
         this.youtube = google.youtube({
           version: "v3",
           auth: this.oauth2Client,
         });
         this.initialized = true;
         console.log("YouTube API initialized successfully");
+
+        // Check if token is expired and try to refresh
+        if (token.expiry_date && token.expiry_date < Date.now()) {
+          console.log("YouTube token expired, attempting to refresh...");
+          try {
+            await this.oauth2Client.getAccessToken();
+            console.log("YouTube token refreshed successfully");
+          } catch (error) {
+            console.error("Failed to refresh YouTube token:", error.message);
+            console.warn("Please re-authorize the application");
+          }
+        }
+
         return true;
       } else {
         console.warn(
@@ -99,12 +131,19 @@ class YouTubeUploader {
   async uploadVideo(filePath, title, description = "") {
     if (!this.initialized) {
       // Fallback: Return local file path if YouTube API is not configured
-      console.log("YouTube API not configured, storing video locally");
+      console.warn("⚠️  YouTube API not configured, storing video locally");
+      console.warn("Videos stored locally won't be visible in the UI.");
+      console.warn(
+        "Please run: node setup-youtube.js to configure YouTube integration",
+      );
       return `/uploads/videos/${path.basename(filePath)}`;
     }
 
     try {
       const fileSize = fs.statSync(filePath).size;
+      console.log(
+        `Uploading video to YouTube: ${title} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`,
+      );
 
       const response = await this.youtube.videos.insert({
         part: ["snippet", "status"],
@@ -116,6 +155,7 @@ class YouTubeUploader {
           },
           status: {
             privacyStatus: "unlisted", // Make video unlisted
+            embeddable: true, // Ensure video can be embedded
           },
         },
         media: {
@@ -126,14 +166,29 @@ class YouTubeUploader {
       const videoId = response.data.id;
       const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-      console.log(`Video uploaded to YouTube: ${youtubeUrl}`);
+      console.log(`✅ Video uploaded to YouTube successfully: ${youtubeUrl}`);
+      console.log(`   Video ID: ${videoId}`);
 
       // Delete local file after successful upload
-      fs.unlinkSync(filePath);
+      try {
+        fs.unlinkSync(filePath);
+        console.log(`   Local file deleted: ${path.basename(filePath)}`);
+      } catch (deleteError) {
+        console.warn(
+          `   Warning: Could not delete local file: ${deleteError.message}`,
+        );
+      }
 
       return youtubeUrl;
     } catch (error) {
-      console.error("YouTube upload failed:", error.message);
+      console.error("❌ YouTube upload failed:", error.message);
+      if (error.code === 401 || error.code === 403) {
+        console.error("   Authentication error. Please re-authorize the app.");
+        console.error("   Run: node setup-youtube.js");
+      }
+      console.error(
+        "   Falling back to local storage (video won't be visible in UI)",
+      );
       // Return local path as fallback
       return `/uploads/videos/${path.basename(filePath)}`;
     }

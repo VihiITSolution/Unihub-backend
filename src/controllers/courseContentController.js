@@ -11,6 +11,23 @@ const addCourseContent = async (req, res, next) => {
   try {
     const { courseId } = req.params;
     const { title, type, duration, order } = req.body;
+
+    // Validate required fields
+    if (!title || !type) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and type are required",
+      });
+    }
+
+    // Validate type value
+    if (type !== "video" && type !== "pdf") {
+      return res.status(400).json({
+        success: false,
+        message: "Type must be either 'video' or 'pdf'",
+      });
+    }
+
     let url;
     let youtubeVideoId = null;
 
@@ -24,7 +41,7 @@ const addCourseContent = async (req, res, next) => {
         const youtubeUrl = await youtubeUploader.uploadVideo(
           videoPath,
           videoTitle,
-          videoDescription
+          videoDescription,
         );
 
         // Extract video ID from YouTube URL
@@ -47,8 +64,9 @@ const addCourseContent = async (req, res, next) => {
       // Use provided URL (for PDFs or if video URL is manually provided)
       url = req.body.url;
     } else if (req.file) {
-      // For PDFs or other files
+      // For PDFs - Cloudinary URL is in req.file.path
       url = req.file.path;
+      console.log("PDF uploaded to Cloudinary:", url);
     } else {
       return res.status(400).json({
         success: false,
@@ -91,9 +109,12 @@ const getCourseContent = async (req, res, next) => {
       ],
     });
 
+    // Filter out any invalid content without type
+    const validContents = contents.filter((content) => content.type);
+
     res.status(200).json({
       success: true,
-      data: { contents },
+      data: { contents: validContents },
     });
   } catch (error) {
     next(error);

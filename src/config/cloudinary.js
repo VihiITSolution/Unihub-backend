@@ -63,9 +63,30 @@ const uploadProfileImage = multer({
   },
 }).single("profileImage");
 
+// Storage for course content PDFs
+const pdfStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/course-pdfs",
+    resource_type: "raw",
+    allowed_formats: ["pdf"],
+    public_id: (req, file) =>
+      `pdf-${Date.now()}-${file.originalname.split(".")[0]}`,
+  },
+});
+
+// PDF upload middleware
+const uploadPDF = multer({
+  storage: pdfStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+  },
+}).single("video");
+
 module.exports = {
   cloudinary,
   uploadThumbnail,
   uploadVideo,
   uploadProfileImage,
+  uploadPDF,
 };
