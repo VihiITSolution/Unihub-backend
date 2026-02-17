@@ -62,6 +62,7 @@ jobs:
               --restart unless-stopped \
               -p 5000:5000 \
               -e NODE_ENV=production \
+              -e HOST=0.0.0.0 \
               -e DB_HOST=${{ secrets.DB_HOST }} \
               -e DB_USER=${{ secrets.DB_USER }} \
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
