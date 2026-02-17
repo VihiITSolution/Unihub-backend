@@ -68,6 +68,7 @@ jobs:
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
               -e DB_NAME=${{ secrets.DB_NAME }} \
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              -e CORS_ORIGIN=${{ secrets.CORS_ORIGIN }} \
               -e CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }} \
               -e CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }} \
               -e CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }} \
