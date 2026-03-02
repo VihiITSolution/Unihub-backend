@@ -62,7 +62,7 @@ const createPayment = async (req, res, next) => {
       enrollmentId,
       marketplaceItemId,
       amount: actualAmount,
-      currency: "USD",
+      currency: "LKR",
       paymentMethod,
       transactionId,
       status: "completed",

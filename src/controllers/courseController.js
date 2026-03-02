@@ -90,6 +90,11 @@ const getCourses = async (req, res, next) => {
           as: "tutor",
           attributes: ["id", "firstName", "lastName", "email", "profileImage"],
         },
+        {
+          model: require("../models/Faculty"),
+          as: "faculty",
+          attributes: ["id", "name", "icon", "description"],
+        },
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
@@ -132,6 +137,11 @@ const getCourseById = async (req, res, next) => {
             "profileImage",
           ],
         },
+        {
+          model: require("../models/Faculty"),
+          as: "faculty",
+          attributes: ["id", "name", "icon", "description"],
+        },
       ],
     });
 
@@ -154,8 +164,24 @@ const getCourseById = async (req, res, next) => {
       isEnrolled = !!enrollment;
     }
 
+    // Fetch reviews for this course
+    const Review = require("../models/Review");
+    const reviews = await Review.findAll({
+      where: { courseId: id },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "profileImage"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: 20,
+    });
+
     const courseData = course.toJSON();
     courseData.isEnrolled = isEnrolled;
+    courseData.reviews = reviews;
 
     res.status(200).json({
       success: true,
@@ -193,6 +219,8 @@ const updateCourse = async (req, res, next) => {
       description,
       category,
       level,
+      facultyId,
+      year,
       price,
       duration,
       thumbnail,
@@ -205,6 +233,13 @@ const updateCourse = async (req, res, next) => {
     if (description) course.description = description;
     if (category) course.category = category;
     if (level) course.level = level;
+    if (facultyId !== undefined) {
+      course.facultyId =
+        facultyId && facultyId !== "" ? parseInt(facultyId) : null;
+    }
+    if (year !== undefined) {
+      course.year = year && year !== "" ? parseInt(year) : null;
+    }
     if (price !== undefined) course.price = price;
     if (duration) course.duration = duration;
     // Handle new thumbnail upload from Cloudinary
@@ -215,10 +250,26 @@ const updateCourse = async (req, res, next) => {
 
     await course.save();
 
+    // Reload course with associations to return complete data
+    const updatedCourse = await Course.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: "tutor",
+          attributes: ["id", "firstName", "lastName", "email", "profileImage"],
+        },
+        {
+          model: require("../models/Faculty"),
+          as: "faculty",
+          attributes: ["id", "name", "icon", "description"],
+        },
+      ],
+    });
+
     res.status(200).json({
       success: true,
       message: "Course updated successfully",
-      data: { course },
+      data: { course: updatedCourse },
     });
   } catch (error) {
     next(error);
@@ -272,6 +323,11 @@ const getMyCourses = async (req, res, next) => {
           as: "approver",
           attributes: ["id", "firstName", "lastName", "email"],
           required: false,
+        },
+        {
+          model: require("../models/Faculty"),
+          as: "faculty",
+          attributes: ["id", "name", "icon", "description"],
         },
       ],
       order: [["createdAt", "DESC"]],
