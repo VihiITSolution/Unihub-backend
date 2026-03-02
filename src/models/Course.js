@@ -26,6 +26,25 @@ const Course = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    facultyId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "faculty_id",
+      references: {
+        model: "faculties",
+        key: "id",
+      },
+    },
+    year: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+        min: 1,
+        max: 4,
+      },
+      comment: "Academic year (1-4)",
+    },
+    // Legacy fields (kept for backward compatibility)
     category: {
       type: DataTypes.STRING(100),
     },

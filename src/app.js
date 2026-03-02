@@ -19,6 +19,7 @@ const liveSessionRoutes = require("./routes/liveSessionRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
 const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const facultyRoutes = require("./routes/facultyRoutes");
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use("/api/live-sessions", liveSessionRoutes);
 app.use("/api/profile/vendor", vendorRoutes);
 app.use("/api/boarding", boardingRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/faculties", facultyRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

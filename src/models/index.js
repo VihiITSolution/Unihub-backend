@@ -13,6 +13,7 @@ const LiveSession = require("./LiveSession");
 const SessionEnrollment = require("./SessionEnrollment");
 const BoardingPlace = require("./BoardingPlace");
 const Review = require("./Review");
+const Faculty = require("./Faculty");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -38,6 +39,14 @@ VendorProfile.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 // User - Course relationship (Tutor creates courses)
 User.hasMany(Course, { foreignKey: "tutorId", as: "courses" });
 Course.belongsTo(User, { foreignKey: "tutorId", as: "tutor" });
+
+// Faculty - Course relationship
+Faculty.hasMany(Course, { foreignKey: "facultyId", as: "courses" });
+Course.belongsTo(Faculty, { foreignKey: "facultyId", as: "faculty" });
+
+// Faculty - User relationship (Created by)
+User.hasMany(Faculty, { foreignKey: "createdBy", as: "createdFaculties" });
+Faculty.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 
 // Course - Admin approval relationship
 User.hasMany(Course, { foreignKey: "approvedBy", as: "approvedCourses" });
@@ -148,4 +157,5 @@ module.exports = {
   SessionEnrollment,
   BoardingPlace,
   Review,
+  Faculty,
 };

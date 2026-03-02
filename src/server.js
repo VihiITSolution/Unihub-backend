@@ -4,6 +4,7 @@ const app = require('./app');
 const { sequelize } = require('./models');
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Test database connection and start server
 const startServer = async () => {
@@ -28,7 +29,7 @@ const startServer = async () => {
 
     // Start server
     app.listen(PORT, () => {
-      console.log(`✓ Server is running on port ${PORT}`);
+      console.log(`Server is running on http://${HOST}:${PORT}`);
       console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`✓ API Documentation: http://localhost:${PORT}/api-docs`);
     });

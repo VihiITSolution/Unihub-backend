@@ -51,6 +51,8 @@ const getCourses = async (req, res, next) => {
     const {
       category,
       level,
+      facultyId,
+      year,
       minPrice,
       maxPrice,
       search,
@@ -60,8 +62,12 @@ const getCourses = async (req, res, next) => {
 
     const where = { isPublished: true };
 
+    // Support both old and new fields for backward compatibility
     if (category) where.category = category;
     if (level) where.level = level;
+    if (facultyId) where.facultyId = facultyId;
+    if (year) where.year = year;
+
     if (minPrice || maxPrice) {
       where.price = {};
       if (minPrice) where.price[Op.gte] = minPrice;
