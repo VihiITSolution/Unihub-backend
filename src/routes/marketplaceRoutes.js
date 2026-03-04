@@ -10,7 +10,10 @@ const {
   createOrder,
   getMyOrders,
   getMySales,
-  updateOrderStatus
+  updateOrderStatus,
+  getListingPaymentInfo,
+  submitBankTransferProof,
+  initiatePayment
 } = require('../controllers/marketplaceController');
 const { authMiddleware } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rateLimiter');
@@ -324,6 +327,116 @@ router.put(
     validate
   ],
   updateOrderStatus
+);
+
+/**
+ * @swagger
+ * /api/marketplace/{id}/payment-info:
+ *   get:
+ *     tags: [Marketplace]
+ *     summary: Get payment information for a listing
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment information retrieved
+ */
+router.get('/:id/payment-info', authMiddleware, getListingPaymentInfo);
+
+/**
+ * @swagger
+ * /api/marketplace/{id}/pay:
+ *   post:
+ *     tags: [Marketplace]
+ *     summary: Initiate payment for a listing
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - paymentMethod
+ *             properties:
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: [payhere, helapay]
+ *     responses:
+ *       200:
+ *         description: Payment initiated successfully
+ */
+router.post(
+  '/:id/pay',
+  authMiddleware,
+  [
+    body('paymentMethod').isIn(['payhere', 'helapay']).withMessage('Invalid payment method'),
+    validate
+  ],
+  initiatePayment
+);
+
+/**
+ * @swagger
+ * /api/marketplace/{id}/bank-transfer:
+ *   post:
+ *     tags: [Marketplace]
+ *     summary: Submit bank transfer proof for listing payment
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - proofImageUrl
+ *               - referenceNumber
+ *               - transferDate
+ *             properties:
+ *               proofImageUrl:
+ *                 type: string
+ *               referenceNumber:
+ *                 type: string
+ *               transferDate:
+ *                 type: string
+ *                 format: date
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Bank transfer proof submitted
+ */
+router.post(
+  '/:id/bank-transfer',
+  authMiddleware,
+  [
+    body('proofImageUrl').trim().notEmpty().withMessage('Proof image is required'),
+    body('referenceNumber').trim().notEmpty().withMessage('Reference number is required'),
+    body('transferDate').isISO8601().withMessage('Valid transfer date is required'),
+    validate
+  ],
+  submitBankTransferProof
 );
 
 module.exports = router;

@@ -45,6 +45,8 @@ class YouTubeUploader {
       const { client_secret, client_id, redirect_uris } =
         credentials.installed || credentials.web || {};
 
+      console.log("DEBUG - redirect_uris from credentials:", redirect_uris);
+
       if (!client_id || !client_secret) {
         console.error(
           "Invalid YouTube credentials format. Missing client_id or client_secret.",
@@ -57,6 +59,8 @@ class YouTubeUploader {
       const redirectUri =
         (redirect_uris && redirect_uris[0]) ||
         "http://localhost:5000/api/youtube/oauth2callback";
+
+      console.log("DEBUG - redirectUri being used:", redirectUri);
 
       this.oauth2Client = new google.auth.OAuth2(
         client_id,

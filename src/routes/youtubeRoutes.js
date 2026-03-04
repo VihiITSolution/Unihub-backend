@@ -3,6 +3,22 @@ const router = express.Router();
 const youtubeUploader = require("../config/youtube");
 
 /**
+ * Debug endpoint to check OAuth configuration
+ */
+router.get("/debug", (req, res) => {
+  try {
+    const redirectUri = youtubeUploader.oauth2Client?._redirectUri || "Not initialized";
+    res.json({ 
+      success: true, 
+      redirectUri: redirectUri,
+      initialized: youtubeUploader.initialized
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * Get YouTube authorization URL
  */
 router.get("/auth", (req, res) => {

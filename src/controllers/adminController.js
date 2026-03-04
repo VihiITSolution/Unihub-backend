@@ -484,6 +484,190 @@ const rejectCourse = async (req, res, next) => {
   }
 };
 
+/**
+ * Get pending marketplace items for approval (Admin only)
+ */
+const getPendingMarketplaceItems = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const where = {
+      isPaid: true, // Only show items that have been paid for
+      approvalStatus: 'pending'
+    };
+
+    const offset = (page - 1) * limit;
+
+    const { count, rows: items } = await MarketplaceItem.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: "seller",
+          attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+        },
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        items,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approve marketplace item (Admin only)
+ */
+const approveMarketplaceItem = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const item = await MarketplaceItem.findByPk(id);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Marketplace item not found",
+      });
+    }
+
+    if (!item.isPaid) {
+      return res.status(400).json({
+        success: false,
+        message: "Item must be paid before approval",
+      });
+    }
+
+    if (item.approvalStatus !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot approve item with status: ${item.approvalStatus}`,
+      });
+    }
+
+    item.approvalStatus = 'approved';
+    item.approvedBy = req.user.id;
+    item.approvedAt = new Date();
+    item.isAvailable = true; // Make available when approved
+
+    await item.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Marketplace item approved successfully",
+      data: { item },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject marketplace item (Admin only)
+ */
+const rejectMarketplaceItem = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const item = await MarketplaceItem.findByPk(id);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Marketplace item not found",
+      });
+    }
+
+    if (item.approvalStatus !== 'pending' && item.approvalStatus !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot reject item with status: ${item.approvalStatus}`,
+      });
+    }
+
+    item.approvalStatus = 'rejected';
+    item.approvedBy = req.user.id;
+    item.approvedAt = new Date();
+    item.rejectionReason = reason || 'No reason provided';
+    item.isAvailable = false;
+
+    await item.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Marketplace item rejected",
+      data: { item },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get pending bank transfers for verification (Admin only)
+ */
+const getPendingBankTransfers = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const where = {
+      paymentMethod: 'bank_transfer',
+      status: 'pending'
+    };
+
+    const offset = (page - 1) * limit;
+
+    const { count, rows: payments } = await Payment.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+        },
+        {
+          model: MarketplaceItem,
+          as: "marketplaceItem",
+          attributes: ["id", "title", "category", "price"],
+        },
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        payments,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUserStatus,
@@ -495,4 +679,8 @@ module.exports = {
   approveCourse,
   rejectCourse,
   getCourseDetails,
+  getPendingMarketplaceItems,
+  approveMarketplaceItem,
+  rejectMarketplaceItem,
+  getPendingBankTransfers
 };

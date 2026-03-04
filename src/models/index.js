@@ -79,6 +79,13 @@ User.hasMany(MarketplaceItem, {
 });
 MarketplaceItem.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
 
+// MarketplaceItem - Admin approval relationship
+User.hasMany(MarketplaceItem, {
+  foreignKey: "approvedBy",
+  as: "approvedMarketplaceItems",
+});
+MarketplaceItem.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
+
 // MarketplaceItem - Payment relationship
 MarketplaceItem.hasMany(Payment, {
   foreignKey: "marketplaceItemId",
@@ -87,6 +94,16 @@ MarketplaceItem.hasMany(Payment, {
 Payment.belongsTo(MarketplaceItem, {
   foreignKey: "marketplaceItemId",
   as: "marketplaceItem",
+});
+
+// MarketplaceItem current payment (one-to-one for ad fee payment)
+MarketplaceItem.belongsTo(Payment, {
+  foreignKey: "paymentId",
+  as: "currentPayment",
+});
+Payment.hasOne(MarketplaceItem, {
+  foreignKey: "paymentId",
+  as: "listingForPayment",
 });
 
 // Order relationships

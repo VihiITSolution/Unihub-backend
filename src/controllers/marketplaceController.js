@@ -1,6 +1,62 @@
-const { MarketplaceItem, User, VendorProfile, Order } = require('../models');
+const { MarketplaceItem, User, VendorProfile, Order, Payment } = require('../models');
 const { Op } = require('sequelize');
 const crypto = require('crypto');
+
+/**
+ * Helper: Check if category requires payment
+ */
+const checkCategoryRequiresPayment = (category) => {
+  const paidCategories = process.env.MARKETPLACE_PAID_CATEGORIES || '';
+  
+  // If empty, all categories require payment (default behavior)
+  if (!paidCategories.trim()) {
+    return true;
+  }
+  
+  // Check if this category is in the paid list
+  const paidList = paidCategories.split(',').map(cat => cat.trim().toLowerCase());
+  return paidList.includes(category.toLowerCase());
+};
+
+/**
+ * Helper: Calculate ad fee based on configuration
+ */
+const calculateAdFee = (category, itemPrice) => {
+  // Check if this category requires payment
+  if (!checkCategoryRequiresPayment(category)) {
+    return 0;
+  }
+  
+  const feeType = process.env.MARKETPLACE_AD_FEE_TYPE || 'fixed';
+  
+  switch (feeType) {
+    case 'percentage':
+      const percentage = parseFloat(process.env.MARKETPLACE_AD_FEE_PERCENTAGE || 5);
+      return (itemPrice * percentage) / 100;
+      
+    case 'free':
+      return 0;
+      
+    case 'fixed':
+    default:
+      return parseFloat(process.env.MARKETPLACE_AD_FEE_AMOUNT || 50.00);
+  }
+};
+
+/**
+ * Helper: Calculate expiration date
+ */
+const calculateExpirationDate = () => {
+  const durationDays = parseInt(process.env.MARKETPLACE_AD_DURATION_DAYS || 30);
+  
+  if (durationDays === 0) {
+    return null; // No expiration
+  }
+  
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + durationDays);
+  return expiresAt;
+};
 
 /**
  * Create marketplace listing (Vendor only)
@@ -26,6 +82,15 @@ const createListing = async (req, res, next) => {
 
     const { title, description, category, itemType, condition, price, images, location, contactInfo, stock } = req.body;
 
+    // Calculate ad fee and check payment requirement
+    const requiresPayment = checkCategoryRequiresPayment(category);
+    const adFee = calculateAdFee(category, price);
+    
+    // Set initial status based on payment requirement
+    const isPaid = !requiresPayment; // Free categories are auto-paid
+    const approvalStatus = !requiresPayment ? 'approved' : 'pending'; // Free categories auto-approved
+    const expiresAt = !requiresPayment ? null : calculateExpirationDate(); // Free categories don't expire initially
+
     const item = await MarketplaceItem.create({
       sellerId: req.user.id,
       title,
@@ -37,13 +102,27 @@ const createListing = async (req, res, next) => {
       images,
       location,
       contactInfo,
-      stock: stock || 0
+      stock: stock || 0,
+      requiresPayment,
+      adFee,
+      isPaid,
+      approvalStatus,
+      expiresAt: isPaid ? null : expiresAt, // Only set expiration after payment
+      paidAt: isPaid ? new Date() : null // Set paidAt for free categories
     });
+
+    const responseMessage = requiresPayment 
+      ? `Listing created successfully. Please complete payment of $${adFee.toFixed(2)} to publish.`
+      : 'Listing created and published successfully (free category)';
 
     res.status(201).json({
       success: true,
-      message: 'Marketplace listing created successfully',
-      data: { item }
+      message: responseMessage,
+      data: { 
+        item,
+        requiresPayment,
+        adFee: requiresPayment ? adFee : 0
+      }
     });
   } catch (error) {
     next(error);
@@ -57,7 +136,16 @@ const getListings = async (req, res, next) => {
   try {
     const { category, itemType, condition, minPrice, maxPrice, search, page = 1, limit = 10 } = req.query;
     
-    const where = { isAvailable: true };
+    // Only show paid and approved items that haven't expired
+    const where = { 
+      isAvailable: true,
+      isPaid: true,
+      approvalStatus: 'approved',
+      [Op.or]: [
+        { expiresAt: null },
+        { expiresAt: { [Op.gt]: new Date() } }
+      ]
+    };
     
     if (category) where.category = category;
     if (itemType) where.itemType = itemType;
@@ -489,6 +577,242 @@ const updateOrderStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * Get payment information for a listing
+ */
+const getListingPaymentInfo = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const item = await MarketplaceItem.findByPk(id);
+    
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Listing not found'
+      });
+    }
+    
+    // Check authorization: only seller can view payment info
+    if (item.sellerId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view payment information for this listing'
+      });
+    }
+    
+    // Get bank details for bank transfer option
+    const bankDetails = {
+      bankName: process.env.BANK_NAME || 'Bank of Ceylon',
+      accountNumber: process.env.BANK_ACCOUNT_NUMBER || '1234567890',
+      accountName: process.env.BANK_ACCOUNT_NAME || 'UniHub Marketplace',
+      branch: process.env.BANK_BRANCH || 'Colombo',
+      swiftCode: process.env.BANK_SWIFT_CODE || 'BCEYLKLX'
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        itemId: item.id,
+        title: item.title,
+        category: item.category,
+        price: item.price,
+        requiresPayment: item.requiresPayment,
+        adFee: item.adFee,
+        isPaid: item.isPaid,
+        paidAt: item.paidAt,
+        approvalStatus: item.approvalStatus,
+        expiresAt: item.expiresAt,
+        paymentMethods: {
+          bankTransfer: bankDetails,
+          payhere: {
+            available: !!process.env.PAYHERE_MERCHANT_ID,
+            mode: process.env.PAYHERE_MODE || 'sandbox'
+          },
+          helapay: {
+            available: !!process.env.HELAPAY_API_KEY,
+            mode: process.env.HELAPAY_MODE || 'sandbox'
+          }
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Submit bank transfer proof for listing payment
+ */
+const submitBankTransferProof = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { proofImageUrl, referenceNumber, transferDate, notes } = req.body;
+    
+    const item = await MarketplaceItem.findByPk(id);
+    
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Listing not found'
+      });
+    }
+    
+    // Check authorization: only seller
+    if (item.sellerId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to submit payment for this listing'
+      });
+    }
+    
+    if (item.isPaid) {
+      return res.status(400).json({
+        success: false,
+        message: 'This listing has already been paid for'
+      });
+    }
+    
+    if (!item.requiresPayment) {
+      return res.status(400).json({
+        success: false,
+        message: 'This listing does not require payment'
+      });
+    }
+    
+    // Create payment record with pending status
+    const payment = await Payment.create({
+      userId: req.user.id,
+      marketplaceItemId: item.id,
+      amount: item.adFee,
+      currency: 'USD',
+      paymentMethod: 'bank_transfer',
+      paymentGateway: 'manual',
+      status: 'pending',
+      metadata: JSON.stringify({
+        proofImageUrl,
+        referenceNumber,
+        transferDate,
+        notes,
+        itemTitle: item.title,
+        submittedAt: new Date()
+      })
+    });
+    
+    // Link payment to item
+    item.paymentId = payment.id;
+    await item.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Bank transfer proof submitted successfully. Pending admin verification.',
+      data: { 
+        payment: {
+          id: payment.id,
+          status: payment.status,
+          method: payment.paymentMethod
+        },
+        item: {
+          id: item.id,
+          title: item.title,
+          approvalStatus: item.approvalStatus
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Initiate online payment (PayHere or HelaPay)
+ * This method creates a payment record and returns payment gateway URL
+ */
+const initiatePayment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { paymentMethod } = req.body; // 'payhere' or 'helapay'
+    
+    const item = await MarketplaceItem.findByPk(id);
+    
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Listing not found'
+      });
+    }
+    
+    // Check authorization: only seller
+    if (item.sellerId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to pay for this listing'
+      });
+    }
+    
+    if (item.isPaid) {
+      return res.status(400).json({
+        success: false,
+        message: 'This listing has already been paid for'
+      });
+    }
+    
+    if (!item.requiresPayment) {
+      return res.status(400).json({
+        success: false,
+        message: 'This listing does not require payment'
+      });
+    }
+    
+    // Validate payment method
+    if (!['payhere', 'helapay'].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid payment method. Use "payhere" or "helapay"'
+      });
+    }
+    
+    // Create payment record
+    const payment = await Payment.create({
+      userId: req.user.id,
+      marketplaceItemId: item.id,
+      amount: item.adFee,
+      currency: 'USD',
+      paymentMethod: paymentMethod,
+      paymentGateway: paymentMethod,
+      status: 'pending',
+      metadata: JSON.stringify({
+        itemTitle: item.title,
+        itemCategory: item.category,
+        initiatedAt: new Date()
+      })
+    });
+    
+    // Link payment to item
+    item.paymentId = payment.id;
+    await item.save();
+    
+    // Payment gateway integration will be handled by payment controller
+    // For now, return payment details for frontend to initiate gateway flow
+    res.status(200).json({
+      success: true,
+      message: 'Payment initiated. Redirect to payment gateway.',
+      data: {
+        paymentId: payment.id,
+        paymentMethod: paymentMethod,
+        amount: item.adFee,
+        currency: 'USD',
+        itemId: item.id,
+        itemTitle: item.title,
+        // Frontend should call payment gateway with this info
+        redirectUrl: `/api/payments/${payment.id}/process`
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createListing,
   getListings,
@@ -499,5 +823,12 @@ module.exports = {
   createOrder,
   getMyOrders,
   getMySales,
-  updateOrderStatus
+  updateOrderStatus,
+  getListingPaymentInfo,
+  submitBankTransferProof,
+  initiatePayment,
+  // Export helpers for use in other modules
+  calculateAdFee,
+  checkCategoryRequiresPayment,
+  calculateExpirationDate
 };
