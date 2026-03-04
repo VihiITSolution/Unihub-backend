@@ -188,3 +188,197 @@ exports.getUniversityCities = async (req, res) => {
     });
   }
 };
+
+// ========== ADMIN OPERATIONS ==========
+
+/**
+ * Create new university (Admin only)
+ */
+exports.createUniversity = async (req, res) => {
+  try {
+    const {
+      name,
+      shortName,
+      city,
+      district,
+      province,
+      address,
+      latitude,
+      longitude,
+      type,
+      website,
+      contactEmail,
+      contactPhone,
+      isActive = true
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !city || !latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, city, latitude, and longitude are required'
+      });
+    }
+
+    // Validate coordinates
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid latitude or longitude values'
+      });
+    }
+
+    // Check for duplicate name
+    const existingUni = await University.findOne({
+      where: { name: { [Op.like]: name } }
+    });
+
+    if (existingUni) {
+      return res.status(400).json({
+        success: false,
+        message: 'A university with this name already exists'
+      });
+    }
+
+    const university = await University.create({
+      name,
+      shortName,
+      city,
+      district,
+      province,
+      address,
+      latitude,
+      longitude,
+      type: type || 'public',
+      website,
+      contactEmail,
+      contactPhone,
+      isActive
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'University created successfully',
+      data: { university }
+    });
+  } catch (error) {
+    console.error('Error creating university:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create university',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Update university (Admin only)
+ */
+exports.updateUniversity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const university = await University.findByPk(id);
+
+    if (!university) {
+      return res.status(404).json({
+        success: false,
+        message: 'University not found'
+      });
+    }
+
+    // Validate coordinates if provided
+    if (updateData.latitude || updateData.longitude) {
+      const lat = updateData.latitude || university.latitude;
+      const lon = updateData.longitude || university.longitude;
+      
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid latitude or longitude values'
+        });
+      }
+    }
+
+    await university.update(updateData);
+
+    res.json({
+      success: true,
+      message: 'University updated successfully',
+      data: { university }
+    });
+  } catch (error) {
+    console.error('Error updating university:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update university',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Delete university (Admin only)
+ */
+exports.deleteUniversity = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const university = await University.findByPk(id);
+
+    if (!university) {
+      return res.status(404).json({
+        success: false,
+        message: 'University not found'
+      });
+    }
+
+    await university.destroy();
+
+    res.json({
+      success: true,
+      message: 'University deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting university:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete university',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Toggle university active status (Admin only)
+ */
+exports.toggleUniversityStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const university = await University.findByPk(id);
+
+    if (!university) {
+      return res.status(404).json({
+        success: false,
+        message: 'University not found'
+      });
+    }
+
+    await university.update({ isActive: !university.isActive });
+
+    res.json({
+      success: true,
+      message: `University ${university.isActive ? 'activated' : 'deactivated'} successfully`,
+      data: { university }
+    });
+  } catch (error) {
+    console.error('Error toggling university status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle university status',
+      error: error.message
+    });
+  }
+};
