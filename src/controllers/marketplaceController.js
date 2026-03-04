@@ -422,12 +422,14 @@ const getMyOrders = async (req, res, next) => {
         {
           model: MarketplaceItem,
           as: 'item',
-          attributes: ['id', 'title', 'images', 'category']
+          attributes: ['id', 'title', 'images', 'category'],
+          required: false // Allow orders with deleted items
         },
         {
           model: User,
           as: 'seller',
-          attributes: ['id', 'firstName', 'lastName', 'email']
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false // Allow orders with deleted sellers
         }
       ],
       limit: parseInt(limit),
@@ -470,12 +472,14 @@ const getMySales = async (req, res, next) => {
         {
           model: MarketplaceItem,
           as: 'item',
-          attributes: ['id', 'title', 'images', 'category']
+          attributes: ['id', 'title', 'images', 'category'],
+          required: false // Allow orders with deleted items
         },
         {
           model: User,
           as: 'buyer',
-          attributes: ['id', 'firstName', 'lastName', 'email']
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false // Allow orders with deleted buyers
         }
       ],
       limit: parseInt(limit),
