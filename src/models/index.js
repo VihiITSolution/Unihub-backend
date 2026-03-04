@@ -14,6 +14,7 @@ const SessionEnrollment = require("./SessionEnrollment");
 const BoardingPlace = require("./BoardingPlace");
 const Review = require("./Review");
 const Faculty = require("./Faculty");
+const University = require("./University");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -175,4 +176,5 @@ module.exports = {
   BoardingPlace,
   Review,
   Faculty,
+  University,
 };
