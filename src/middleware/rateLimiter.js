@@ -6,7 +6,7 @@ const isDevelopment = process.env.NODE_ENV === "development";
 // General API rate limiter
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 1000 : 100, // Much higher limit for development
+  max: isDevelopment ? 1000 : 500, // Increased for testing: 500 requests per 15min
   message: {
     success: false,
     message: "Too many requests from this IP, please try again later.",
