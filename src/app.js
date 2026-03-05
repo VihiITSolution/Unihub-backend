@@ -21,6 +21,7 @@ const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const universityRoutes = require("./routes/universityRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 
@@ -85,6 +86,7 @@ app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/youtube", youtubeRoutes);
 app.use("/api/live-sessions", liveSessionRoutes);
+app.use("/api/profile", profileRoutes);
 app.use("/api/profile/vendor", vendorRoutes);
 app.use("/api/boarding", boardingRoutes);
 app.use("/api/reviews", reviewRoutes);
