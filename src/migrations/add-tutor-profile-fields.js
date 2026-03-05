@@ -12,57 +12,50 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.addColumn("tutor_profiles", "graduationStatus", {
+    await queryInterface.addColumn("tutor_profiles", "graduation_status", {
       type: Sequelize.ENUM("graduate", "undergraduate"),
       allowNull: true,
-      after: "qualifications",
     });
 
-    await queryInterface.addColumn("tutor_profiles", "coursesSubjects", {
+    await queryInterface.addColumn("tutor_profiles", "courses_subjects", {
       type: Sequelize.JSON,
       allowNull: true,
-      defaultValue: "[]",
-      after: "expertiseAreas",
     });
 
-    await queryInterface.addColumn("tutor_profiles", "youtubeLink", {
+    await queryInterface.addColumn("tutor_profiles", "youtube_link", {
       type: Sequelize.STRING(500),
       allowNull: true,
-      after: "coursesSubjects",
     });
 
-    await queryInterface.addColumn("tutor_profiles", "blogLink", {
+    await queryInterface.addColumn("tutor_profiles", "blog_link", {
       type: Sequelize.STRING(500),
       allowNull: true,
-      after: "youtubeLink",
     });
 
-    await queryInterface.addColumn("tutor_profiles", "linkedinLink", {
+    await queryInterface.addColumn("tutor_profiles", "linkedin_link", {
       type: Sequelize.STRING(500),
       allowNull: true,
-      after: "blogLink",
     });
 
     await queryInterface.addColumn("tutor_profiles", "remarks", {
       type: Sequelize.TEXT,
       allowNull: true,
-      after: "bio",
     });
 
     console.log("✅ Successfully added new fields to tutor_profiles table");
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.removeColumn("tutor_profiles", "graduationStatus");
-    await queryInterface.removeColumn("tutor_profiles", "coursesSubjects");
-    await queryInterface.removeColumn("tutor_profiles", "youtubeLink");
-    await queryInterface.removeColumn("tutor_profiles", "blogLink");
-    await queryInterface.removeColumn("tutor_profiles", "linkedinLink");
+    await queryInterface.removeColumn("tutor_profiles", "graduation_status");
+    await queryInterface.removeColumn("tutor_profiles", "courses_subjects");
+    await queryInterface.removeColumn("tutor_profiles", "youtube_link");
+    await queryInterface.removeColumn("tutor_profiles", "blog_link");
+    await queryInterface.removeColumn("tutor_profiles", "linkedin_link");
     await queryInterface.removeColumn("tutor_profiles", "remarks");
 
     // Drop the ENUM type if it exists
     await queryInterface.sequelize.query(
-      "DROP TYPE IF EXISTS enum_tutor_profiles_graduationStatus;",
+      "DROP TYPE IF EXISTS enum_tutor_profiles_graduation_status;",
     );
 
     console.log("✅ Successfully removed new fields from tutor_profiles table");

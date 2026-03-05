@@ -493,7 +493,7 @@ const getPendingMarketplaceItems = async (req, res, next) => {
 
     const where = {
       isPaid: true, // Only show items that have been paid for
-      approvalStatus: 'pending'
+      approvalStatus: "pending",
     };
 
     const offset = (page - 1) * limit;
@@ -552,14 +552,14 @@ const approveMarketplaceItem = async (req, res, next) => {
       });
     }
 
-    if (item.approvalStatus !== 'pending') {
+    if (item.approvalStatus !== "pending") {
       return res.status(400).json({
         success: false,
         message: `Cannot approve item with status: ${item.approvalStatus}`,
       });
     }
 
-    item.approvalStatus = 'approved';
+    item.approvalStatus = "approved";
     item.approvedBy = req.user.id;
     item.approvedAt = new Date();
     item.isAvailable = true; // Make available when approved
@@ -593,17 +593,20 @@ const rejectMarketplaceItem = async (req, res, next) => {
       });
     }
 
-    if (item.approvalStatus !== 'pending' && item.approvalStatus !== 'approved') {
+    if (
+      item.approvalStatus !== "pending" &&
+      item.approvalStatus !== "approved"
+    ) {
       return res.status(400).json({
         success: false,
         message: `Cannot reject item with status: ${item.approvalStatus}`,
       });
     }
 
-    item.approvalStatus = 'rejected';
+    item.approvalStatus = "rejected";
     item.approvedBy = req.user.id;
     item.approvedAt = new Date();
-    item.rejectionReason = reason || 'No reason provided';
+    item.rejectionReason = reason || "No reason provided";
     item.isAvailable = false;
 
     await item.save();
@@ -626,8 +629,8 @@ const getPendingBankTransfers = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query;
 
     const where = {
-      paymentMethod: 'bank_transfer',
-      status: 'pending'
+      paymentMethod: "bank_transfer",
+      status: "pending",
     };
 
     const offset = (page - 1) * limit;
@@ -668,6 +671,95 @@ const getPendingBankTransfers = async (req, res, next) => {
   }
 };
 
+/**
+ * Get all tutor profiles (Admin only)
+ */
+const getAllTutorProfiles = async (req, res, next) => {
+  try {
+    const { approvalStatus, page = 1, limit = 10 } = req.query;
+
+    const where = {};
+    if (approvalStatus) where.approvalStatus = approvalStatus;
+
+    const offset = (page - 1) * limit;
+
+    const { count, rows: tutorProfiles } = await TutorProfile.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "firstName", "lastName", "email", "profileImage"],
+        },
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        tutorProfiles,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get tutor profile details (Admin only)
+ */
+const getTutorProfileDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const tutorProfile = await TutorProfile.findByPk(id, {
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "email",
+            "profileImage",
+            "phoneNumber",
+            "createdAt",
+          ],
+        },
+        {
+          model: User,
+          as: "approver",
+          attributes: ["id", "firstName", "lastName"],
+        },
+      ],
+    });
+
+    if (!tutorProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor profile not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: tutorProfile,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUserStatus,
@@ -682,5 +774,7 @@ module.exports = {
   getPendingMarketplaceItems,
   approveMarketplaceItem,
   rejectMarketplaceItem,
-  getPendingBankTransfers
+  getPendingBankTransfers,
+  getAllTutorProfiles,
+  getTutorProfileDetails,
 };
