@@ -22,6 +22,7 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const universityRoutes = require("./routes/universityRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use("/api/boarding", boardingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/faculties", facultyRoutes);
 app.use("/api/universities", universityRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

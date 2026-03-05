@@ -1,4 +1,5 @@
 const { User, StudentProfile, TutorProfile } = require("../models");
+const { createNotification } = require("./notificationController");
 
 /**
  * Get student profile for current user
@@ -294,6 +295,16 @@ const reviewTutorApplication = async (req, res, next) => {
         await user.save();
       }
 
+      // Create notification for user
+      await createNotification(
+        user.id,
+        "tutor_approved",
+        "Tutor Application Approved! 🎉",
+        "Congratulations! Your tutor application has been approved by UniHub. You can now start creating courses and sharing your knowledge with students.",
+        "/tutor/my-profile",
+        { approvedBy: req.user.id },
+      );
+
       res.status(200).json({
         success: true,
         message: "Tutor application approved",
@@ -308,6 +319,18 @@ const reviewTutorApplication = async (req, res, next) => {
         rejectionReason:
           rejectionReason || "Application did not meet requirements",
       });
+
+      // Create notification for user
+      await createNotification(
+        profile.user.id,
+        "tutor_rejected",
+        "Tutor Application Update",
+        `Unfortunately, your tutor application has been rejected. Reason: ${
+          rejectionReason || "Application did not meet requirements"
+        }. Please review our requirements and feel free to reapply in the future.`,
+        "/student/become-tutor",
+        { rejectionReason, rejectedBy: req.user.id },
+      );
 
       res.status(200).json({
         success: true,
