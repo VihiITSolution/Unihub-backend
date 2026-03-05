@@ -79,6 +79,71 @@ const MarketplaceItem = sequelize.define('MarketplaceItem', {
   contactInfo: {
     type: DataTypes.STRING(255),
     field: 'contact_info'
+  },
+  // Payment fields
+  isPaid: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_paid',
+    comment: 'Whether the ad fee has been paid'
+  },
+  adFee: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00,
+    field: 'ad_fee',
+    comment: 'Calculated ad posting fee'
+  },
+  paidAt: {
+    type: DataTypes.DATE,
+    field: 'paid_at',
+    comment: 'Timestamp when payment was completed'
+  },
+  paymentId: {
+    type: DataTypes.INTEGER,
+    field: 'payment_id',
+    references: {
+      model: 'payments',
+      key: 'id'
+    },
+    comment: 'Reference to payment record'
+  },
+  // Approval workflow fields
+  approvalStatus: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending',
+    field: 'approval_status',
+    comment: 'Admin approval status'
+  },
+  approvedBy: {
+    type: DataTypes.INTEGER,
+    field: 'approved_by',
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    comment: 'Admin who approved/rejected the listing'
+  },
+  approvedAt: {
+    type: DataTypes.DATE,
+    field: 'approved_at',
+    comment: 'Timestamp of approval/rejection'
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
+    field: 'rejection_reason',
+    comment: 'Reason for rejection if applicable'
+  },
+  // Expiration fields
+  expiresAt: {
+    type: DataTypes.DATE,
+    field: 'expires_at',
+    comment: 'Ad expiration timestamp'
+  },
+  requiresPayment: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'requires_payment',
+    comment: 'Whether this category requires payment'
   }
 }, {
   tableName: 'marketplace_items',

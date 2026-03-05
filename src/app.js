@@ -20,6 +20,7 @@ const vendorRoutes = require("./routes/vendorRoutes");
 const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
+const universityRoutes = require("./routes/universityRoutes");
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use("/api/profile/vendor", vendorRoutes);
 app.use("/api/boarding", boardingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/faculties", facultyRoutes);
+app.use("/api/universities", universityRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

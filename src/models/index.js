@@ -14,6 +14,7 @@ const SessionEnrollment = require("./SessionEnrollment");
 const BoardingPlace = require("./BoardingPlace");
 const Review = require("./Review");
 const Faculty = require("./Faculty");
+const University = require("./University");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -79,6 +80,13 @@ User.hasMany(MarketplaceItem, {
 });
 MarketplaceItem.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
 
+// MarketplaceItem - Admin approval relationship
+User.hasMany(MarketplaceItem, {
+  foreignKey: "approvedBy",
+  as: "approvedMarketplaceItems",
+});
+MarketplaceItem.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
+
 // MarketplaceItem - Payment relationship
 MarketplaceItem.hasMany(Payment, {
   foreignKey: "marketplaceItemId",
@@ -87,6 +95,16 @@ MarketplaceItem.hasMany(Payment, {
 Payment.belongsTo(MarketplaceItem, {
   foreignKey: "marketplaceItemId",
   as: "marketplaceItem",
+});
+
+// MarketplaceItem current payment (one-to-one for ad fee payment)
+MarketplaceItem.belongsTo(Payment, {
+  foreignKey: "paymentId",
+  as: "currentPayment",
+});
+Payment.hasOne(MarketplaceItem, {
+  foreignKey: "paymentId",
+  as: "listingForPayment",
 });
 
 // Order relationships
@@ -158,4 +176,5 @@ module.exports = {
   BoardingPlace,
   Review,
   Faculty,
+  University,
 };

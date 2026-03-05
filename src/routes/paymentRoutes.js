@@ -3,7 +3,11 @@ const { body } = require('express-validator');
 const { 
   createPayment, 
   getPaymentHistory, 
-  getPaymentById 
+  getPaymentById,
+  processPayment,
+  webhookPayHere,
+  webhookHelaPay,
+  verifyBankTransfer
 } = require('../controllers/paymentController');
 const { authMiddleware } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rateLimiter');
@@ -82,5 +86,91 @@ router.get('/', authMiddleware, getPaymentHistory);
  *         description: Payment details
  */
 router.get('/:id', authMiddleware, getPaymentById);
+
+/**
+ * @swagger
+ * /api/payments/{id}/process:
+ *   post:
+ *     tags: [Payments]
+ *     summary: Process payment through gateway
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment processing initialized
+ */
+router.post('/:id/process', authMiddleware, processPayment);
+
+/**
+ * @swagger
+ * /api/payments/webhook/payhere:
+ *   post:
+ *     tags: [Payments]
+ *     summary: PayHere webhook endpoint (public)
+ *     responses:
+ *       200:
+ *         description: Webhook processed
+ */
+router.post('/webhook/payhere', webhookPayHere);
+
+/**
+ * @swagger
+ * /api/payments/webhook/helapay:
+ *   post:
+ *     tags: [Payments]
+ *     summary: HelaPay webhook endpoint (public)
+ *     responses:
+ *       200:
+ *         description: Webhook processed
+ */
+router.post('/webhook/helapay', webhookHelaPay);
+
+/**
+ * @swagger
+ * /api/payments/{id}/verify:
+ *   put:
+ *     tags: [Payments]
+ *     summary: Verify bank transfer (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - approved
+ *             properties:
+ *               approved:
+ *                 type: boolean
+ *               rejectionReason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Bank transfer verified
+ */
+router.put(
+  '/:id/verify',
+  authMiddleware,
+  [
+    body('approved').isBoolean().withMessage('Approved status is required'),
+    body('rejectionReason').optional().trim(),
+    validate
+  ],
+  verifyBankTransfer
+);
 
 module.exports = router;

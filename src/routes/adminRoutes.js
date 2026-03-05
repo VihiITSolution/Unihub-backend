@@ -9,7 +9,11 @@ const {
   getPendingCourses,
   approveCourse,
   rejectCourse,
-  getCourseDetails
+  getCourseDetails,
+  getPendingMarketplaceItems,
+  approveMarketplaceItem,
+  rejectMarketplaceItem,
+  getPendingBankTransfers
 } = require('../controllers/adminController');
 const { authMiddleware, authorize } = require('../middleware/auth');
 
@@ -340,5 +344,99 @@ router.put('/courses/:id/reject', authMiddleware, authorize('admin'), rejectCour
  *         description: Course details with tutor profile
  */
 router.get('/courses/:id/details', authMiddleware, authorize('admin'), getCourseDetails);
+
+/**
+ * @swagger
+ * /api/admin/marketplace/pending:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get marketplace items pending approval (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of pending marketplace items
+ */
+router.get('/marketplace/pending', authMiddleware, authorize('admin'), getPendingMarketplaceItems);
+
+/**
+ * @swagger
+ * /api/admin/marketplace/{id}/approve:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Approve a marketplace item (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Marketplace item approved
+ */
+router.put('/marketplace/:id/approve', authMiddleware, authorize('admin'), approveMarketplaceItem);
+
+/**
+ * @swagger
+ * /api/admin/marketplace/{id}/reject:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Reject a marketplace item (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Marketplace item rejected
+ */
+router.put('/marketplace/:id/reject', authMiddleware, authorize('admin'), rejectMarketplaceItem);
+
+/**
+ * @swagger
+ * /api/admin/payments/bank-transfers/pending:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get pending bank transfers for verification (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of pending bank transfers
+ */
+router.get('/payments/bank-transfers/pending', authMiddleware, authorize('admin'), getPendingBankTransfers);
 
 module.exports = router;
