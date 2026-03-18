@@ -26,6 +26,11 @@ const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
+// App is behind Nginx reverse proxy in production
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 // Security middleware
 app.use(helmet());
 
