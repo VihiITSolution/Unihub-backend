@@ -23,8 +23,6 @@ const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const universityRoutes = require("./routes/universityRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
