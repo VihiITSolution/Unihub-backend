@@ -1,24 +1,26 @@
-const jwt = require('jsonwebtoken');
-const { User } = require('../models');
+const jwt = require("jsonwebtoken");
+const { User } = require("../models");
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Access denied. No token provided.'
+        message: "Access denied. No token provided.",
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
     const user = await User.findByPk(decoded.id);
 
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token or user inactive.'
+        message: "Invalid token or user inactive.",
       });
     }
 
@@ -27,7 +29,7 @@ const authMiddleware = async (req, res, next) => {
   } catch (error) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid token.'
+      message: "Invalid token.",
     });
   }
 };
@@ -41,18 +43,21 @@ const authorize = (...allowedRoles) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Authentication required.'
+        message: "Authentication required.",
       });
     }
 
     // Check if user has at least one of the allowed roles
-    const userRoles = req.user.roles || [];
-    const hasRole = allowedRoles.some(role => userRoles.includes(role));
+    const userRoles = Array.isArray(req.user.roles) ? req.user.roles : [];
+    const primaryRole = req.user.primaryRole;
+    const hasRole = allowedRoles.some(
+      (role) => userRoles.includes(role) || primaryRole === role,
+    );
 
     if (!hasRole) {
       return res.status(403).json({
         success: false,
-        message: 'Access forbidden. Insufficient permissions.'
+        message: "Access forbidden. Insufficient permissions.",
       });
     }
 
@@ -62,13 +67,15 @@ const authorize = (...allowedRoles) => {
 
 const optionalAuthMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
       return next();
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
     const user = await User.findByPk(decoded.id);
 
     if (user && user.isActive) {
@@ -89,4 +96,3 @@ const hasRole = (user, role) => {
 };
 
 module.exports = { authMiddleware, optionalAuthMiddleware, authorize, hasRole };
-
