@@ -18,7 +18,7 @@ const apiLimiter = rateLimit({
 // Stricter rate limiter for authentication endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 50 : 5, // More relaxed for development
+  max: isDevelopment ? 50 : 25, // More relaxed for development
   message: {
     success: false,
     message: "Too many authentication attempts, please try again later.",
