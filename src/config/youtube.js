@@ -25,48 +25,62 @@ class YouTubeUploader {
   }
 
   /**
+   * Ensure OAuth2 client is initialized from credentials file.
+   * This is used by auth URL generation and callback exchange paths.
+   */
+  ensureOAuthClient() {
+    if (this.oauth2Client) {
+      return true;
+    }
+
+    const credentialsPath = path.join(__dirname, "youtube-credentials.json");
+
+    if (!fs.existsSync(credentialsPath)) {
+      throw new Error(
+        "YouTube credentials not found at src/config/youtube-credentials.json",
+      );
+    }
+
+    const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
+    const { client_secret, client_id, redirect_uris } =
+      credentials.installed || credentials.web || {};
+
+    if (!client_id || !client_secret) {
+      throw new Error(
+        "Invalid YouTube credentials format. Missing client_id or client_secret.",
+      );
+    }
+
+    const redirectUri =
+      (redirect_uris && redirect_uris[0]) ||
+      "http://localhost:5000/api/youtube/oauth2callback";
+
+    this.oauth2Client = new google.auth.OAuth2(
+      client_id,
+      client_secret,
+      redirectUri,
+    );
+
+    return true;
+  }
+
+  /**
    * Initialize YouTube API with OAuth2
    */
   async initialize() {
     try {
-      const credentialsPath = path.join(__dirname, "youtube-credentials.json");
       const tokenPath = path.join(__dirname, "youtube-token.json");
 
-      // Check if credentials exist
-      if (!fs.existsSync(credentialsPath)) {
+      try {
+        this.ensureOAuthClient();
+      } catch (clientError) {
         console.warn(
-          "YouTube credentials not found. Video uploads will be stored locally.",
+          "YouTube credentials not found/invalid. Video uploads will be stored locally.",
         );
+        console.warn(clientError.message);
         this.initialized = false;
         return false;
       }
-
-      const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
-      const { client_secret, client_id, redirect_uris } =
-        credentials.installed || credentials.web || {};
-
-      console.log("DEBUG - redirect_uris from credentials:", redirect_uris);
-
-      if (!client_id || !client_secret) {
-        console.error(
-          "Invalid YouTube credentials format. Missing client_id or client_secret.",
-        );
-        this.initialized = false;
-        return false;
-      }
-
-      // Use redirect_uris if available, otherwise use default
-      const redirectUri =
-        (redirect_uris && redirect_uris[0]) ||
-        "http://localhost:5000/api/youtube/oauth2callback";
-
-      console.log("DEBUG - redirectUri being used:", redirectUri);
-
-      this.oauth2Client = new google.auth.OAuth2(
-        client_id,
-        client_secret,
-        redirectUri,
-      );
 
       // Check if token exists
       if (fs.existsSync(tokenPath)) {
@@ -203,6 +217,8 @@ class YouTubeUploader {
    * This is needed only once to get the refresh token
    */
   getAuthUrl() {
+    this.ensureOAuthClient();
+
     const scopes = [
       "https://www.googleapis.com/auth/youtube.upload",
       "https://www.googleapis.com/auth/youtube",
@@ -212,6 +228,8 @@ class YouTubeUploader {
     const url = this.oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: scopes,
+      prompt: "consent",
+      include_granted_scopes: true,
     });
 
     return url;
@@ -223,12 +241,14 @@ class YouTubeUploader {
    */
   async getTokenFromCode(code) {
     try {
+      this.ensureOAuthClient();
+
       const { tokens } = await this.oauth2Client.getToken(code);
       this.oauth2Client.setCredentials(tokens);
 
       // Save tokens for future use
       const tokenPath = path.join(__dirname, "youtube-token.json");
-      fs.writeFileSync(tokenPath, JSON.stringify(tokens));
+      fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
 
       this.youtube = google.youtube({ version: "v3", auth: this.oauth2Client });
       this.initialized = true;
