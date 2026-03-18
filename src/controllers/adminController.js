@@ -8,6 +8,7 @@ const {
   CourseContent,
 } = require("../models");
 const { Op } = require("sequelize");
+const { createNotification } = require("./notificationController");
 
 /**
  * Get all users (Admin only)
@@ -760,6 +761,144 @@ const getTutorProfileDetails = async (req, res, next) => {
   }
 };
 
+/**
+ * Approve tutor profile (Admin only)
+ */
+const approveTutorProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const profile = await TutorProfile.findByPk(id, {
+      include: [{ model: User, as: "user" }],
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor profile not found",
+      });
+    }
+
+    if (profile.approvalStatus === "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Tutor profile is already approved",
+      });
+    }
+
+    await profile.update({
+      isApproved: true,
+      approvalStatus: "approved",
+      approvedBy: req.user.id,
+      approvedAt: new Date(),
+      rejectionReason: null,
+    });
+
+    const user = profile.user || (await User.findByPk(profile.userId));
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found for tutor profile",
+      });
+    }
+
+    const currentRoles = Array.isArray(user.roles) ? user.roles : [];
+    if (!currentRoles.includes("tutor")) {
+      user.roles = [...currentRoles, "tutor"];
+    }
+
+    user.isTutorProfileComplete = true;
+    if (user.primaryRole !== "tutor") {
+      user.primaryRole = "tutor";
+    }
+
+    await user.save();
+
+    try {
+      await createNotification(
+        user.id,
+        "tutor_approved",
+        "Tutor Application Approved! 🎉",
+        "Congratulations! Your tutor application has been approved by UniHub. You can now start creating courses and sharing your knowledge with students.",
+        "/tutor/my-profile",
+        { approvedBy: req.user.id },
+      );
+    } catch (notifError) {
+      console.error("❌ Failed to send notification:", notifError.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Tutor application approved",
+      data: { profile },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject tutor profile (Admin only)
+ */
+const rejectTutorProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const profile = await TutorProfile.findByPk(id, {
+      include: [{ model: User, as: "user" }],
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor profile not found",
+      });
+    }
+
+    if (profile.approvalStatus === "rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Tutor profile is already rejected",
+      });
+    }
+
+    await profile.update({
+      isApproved: false,
+      approvalStatus: "rejected",
+      approvedBy: req.user.id,
+      approvedAt: new Date(),
+      rejectionReason: reason || "Application did not meet requirements",
+    });
+
+    const user = profile.user || (await User.findByPk(profile.userId));
+    if (user) {
+      try {
+        await createNotification(
+          user.id,
+          "tutor_rejected",
+          "Tutor Application Update",
+          `Unfortunately, your tutor application has been rejected. Reason: ${
+            reason || "Application did not meet requirements"
+          }. Please review our requirements and feel free to reapply in the future.`,
+          "/student/become-tutor",
+          { rejectionReason: reason, rejectedBy: req.user.id },
+        );
+      } catch (notifError) {
+        console.error("❌ Failed to send notification:", notifError.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Tutor application rejected",
+      data: { profile },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUserStatus,
@@ -777,4 +916,6 @@ module.exports = {
   getPendingBankTransfers,
   getAllTutorProfiles,
   getTutorProfileDetails,
+  approveTutorProfile,
+  rejectTutorProfile,
 };

@@ -16,6 +16,8 @@ const {
   getPendingBankTransfers,
   getAllTutorProfiles,
   getTutorProfileDetails,
+  approveTutorProfile,
+  rejectTutorProfile,
 } = require("../controllers/adminController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 
@@ -537,6 +539,64 @@ router.get(
   authMiddleware,
   authorize("admin"),
   getTutorProfileDetails,
+);
+
+/**
+ * @swagger
+ * /api/admin/tutor-profiles/{id}/approve:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Approve a tutor profile (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Tutor profile approved
+ */
+router.put(
+  "/tutor-profiles/:id/approve",
+  authMiddleware,
+  authorize("admin"),
+  approveTutorProfile,
+);
+
+/**
+ * @swagger
+ * /api/admin/tutor-profiles/{id}/reject:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Reject a tutor profile (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Tutor profile rejected
+ */
+router.put(
+  "/tutor-profiles/:id/reject",
+  authMiddleware,
+  authorize("admin"),
+  rejectTutorProfile,
 );
 
 module.exports = router;
