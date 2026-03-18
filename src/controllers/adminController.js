@@ -767,25 +767,41 @@ const getTutorProfileDetails = async (req, res, next) => {
 const approveTutorProfile = async (req, res, next) => {
   try {
     const { id } = req.params;
+    console.log("🚀 [BACKEND] Approve TutorProfile Handler Called");
+    console.log("🚀 [BACKEND] Profile ID:", id);
+    console.log("🚀 [BACKEND] Admin User ID:", req.user?.id);
+    console.log("🚀 [BACKEND] Admin User:", req.user?.email);
 
+    // Step 1: Fetch tutor profile
     const profile = await TutorProfile.findByPk(id, {
       include: [{ model: User, as: "user" }],
     });
 
     if (!profile) {
+      console.error("❌ [BACKEND] Tutor profile not found with ID:", id);
       return res.status(404).json({
         success: false,
         message: "Tutor profile not found",
       });
     }
 
+    console.log("✅ [BACKEND] Profile found:", profile.id, profile.userId);
+    console.log(
+      "📝 [BACKEND] Current approval status:",
+      profile.approvalStatus,
+    );
+
+    // Step 2: Check if already approved
     if (profile.approvalStatus === "approved") {
+      console.warn("⚠️ [BACKEND] Profile already approved");
       return res.status(400).json({
         success: false,
         message: "Tutor profile is already approved",
       });
     }
 
+    // Step 3: Update profile
+    console.log("📝 [BACKEND] Updating profile approval status...");
     await profile.update({
       isApproved: true,
       approvalStatus: "approved",
@@ -793,29 +809,54 @@ const approveTutorProfile = async (req, res, next) => {
       approvedAt: new Date(),
       rejectionReason: null,
     });
+    console.log("✅ [BACKEND] Profile updated successfully");
 
-    const user = profile.user || (await User.findByPk(profile.userId));
+    // Step 4: Fetch or use existing user
+    let user = profile.user;
     if (!user) {
+      console.log("📝 [BACKEND] Fetching user by ID:", profile.userId);
+      user = await User.findByPk(profile.userId);
+    }
+
+    if (!user) {
+      console.error("❌ [BACKEND] User not found with ID:", profile.userId);
       return res.status(404).json({
         success: false,
         message: "User not found for tutor profile",
       });
     }
 
-    const currentRoles = Array.isArray(user.roles) ? user.roles : [];
+    console.log("✅ [BACKEND] User fetched:", user.id, user.email);
+    console.log("📝 [BACKEND] Current user roles:", user.roles);
+    console.log("📝 [BACKEND] Current primary role:", user.primaryRole);
+
+    // Step 5: Update user roles
+    const currentRoles = Array.isArray(user.roles) ? [...user.roles] : [];
+    console.log("📝 [BACKEND] Processing roles array...");
+
     if (!currentRoles.includes("tutor")) {
-      user.roles = [...currentRoles, "tutor"];
+      currentRoles.push("tutor");
+      console.log("📝 [BACKEND] Added 'tutor' role to array");
+    } else {
+      console.log("📝 [BACKEND] 'tutor' role already in array");
     }
 
+    user.roles = currentRoles;
     user.isTutorProfileComplete = true;
-    if (user.primaryRole !== "tutor") {
-      user.primaryRole = "tutor";
-    }
+    user.primaryRole = "tutor";
 
+    console.log("📝 [BACKEND] Saving user with new roles:", user.roles);
     await user.save();
+    console.log(
+      "✅ [BACKEND] User roles updated successfully:",
+      user.roles,
+      user.primaryRole,
+    );
 
+    // Step 6: Create notification (non-blocking)
+    console.log("📝 [BACKEND] Creating notification for user:", user.id);
     try {
-      await createNotification(
+      const notification = await createNotification(
         user.id,
         "tutor_approved",
         "Tutor Application Approved! 🎉",
@@ -823,16 +864,30 @@ const approveTutorProfile = async (req, res, next) => {
         "/tutor/my-profile",
         { approvedBy: req.user.id },
       );
+      console.log("✅ [BACKEND] Notification created successfully");
     } catch (notifError) {
-      console.error("❌ Failed to send notification:", notifError.message);
+      console.warn(
+        "⚠️ [BACKEND] Failed to send notification:",
+        notifError.message,
+      );
+      // Don't fail the request if notification fails
     }
 
+    // Step 7: Return success response
+    console.log("✅ [BACKEND] Returning success response");
     res.status(200).json({
       success: true,
-      message: "Tutor application approved",
-      data: { profile },
+      message: "Tutor application approved successfully",
+      data: {
+        profile: {
+          ...profile.toJSON(),
+          user: user.toJSON(),
+        },
+      },
     });
   } catch (error) {
+    console.error("🛑 [BACKEND] Error in approveTutorProfile:", error.message);
+    console.error("🛑 [BACKEND] Error stack:", error.stack);
     next(error);
   }
 };
@@ -845,56 +900,89 @@ const rejectTutorProfile = async (req, res, next) => {
     const { id } = req.params;
     const { reason } = req.body;
 
+    console.log("🔴 [BACKEND] Reject TutorProfile Handler Called");
+    console.log("🔴 [BACKEND] Profile ID:", id);
+    console.log("🔴 [BACKEND] Rejection reason:", reason);
+    console.log("🔴 [BACKEND] Admin User ID:", req.user?.id);
+
+    // Step 1: Fetch tutor profile
     const profile = await TutorProfile.findByPk(id, {
       include: [{ model: User, as: "user" }],
     });
 
     if (!profile) {
+      console.error("❌ [BACKEND] Tutor profile not found with ID:", id);
       return res.status(404).json({
         success: false,
         message: "Tutor profile not found",
       });
     }
 
+    console.log("✅ [BACKEND] Profile found:", profile.id);
+
+    // Step 2: Check if already rejected
     if (profile.approvalStatus === "rejected") {
+      console.warn("⚠️ [BACKEND] Profile already rejected");
       return res.status(400).json({
         success: false,
         message: "Tutor profile is already rejected",
       });
     }
 
+    // Step 3: Update profile
+    const finalReason = reason || "Application did not meet requirements";
+    console.log("📝 [BACKEND] Updating profile with rejection reason...");
+
     await profile.update({
       isApproved: false,
       approvalStatus: "rejected",
       approvedBy: req.user.id,
       approvedAt: new Date(),
-      rejectionReason: reason || "Application did not meet requirements",
+      rejectionReason: finalReason,
     });
 
-    const user = profile.user || (await User.findByPk(profile.userId));
+    console.log("✅ [BACKEND] Profile updated successfully");
+
+    // Step 4: Fetch or use existing user
+    let user = profile.user;
+    if (!user) {
+      user = await User.findByPk(profile.userId);
+    }
+
     if (user) {
+      console.log(
+        "📝 [BACKEND] Creating rejection notification for user:",
+        user.id,
+      );
       try {
         await createNotification(
           user.id,
           "tutor_rejected",
           "Tutor Application Update",
-          `Unfortunately, your tutor application has been rejected. Reason: ${
-            reason || "Application did not meet requirements"
-          }. Please review our requirements and feel free to reapply in the future.`,
+          `Unfortunately, your tutor application has been rejected. Reason: ${finalReason}. Please review our requirements and feel free to reapply in the future.`,
           "/student/become-tutor",
-          { rejectionReason: reason, rejectedBy: req.user.id },
+          { rejectionReason: finalReason, rejectedBy: req.user.id },
         );
+        console.log("✅ [BACKEND] Rejection notification created");
       } catch (notifError) {
-        console.error("❌ Failed to send notification:", notifError.message);
+        console.warn(
+          "⚠️ [BACKEND] Failed to send rejection notification:",
+          notifError.message,
+        );
       }
+    } else {
+      console.warn("⚠️ [BACKEND] User not found for notification");
     }
 
+    console.log("✅ [BACKEND] Returning success response");
     res.status(200).json({
       success: true,
-      message: "Tutor application rejected",
+      message: "Tutor application rejected successfully",
       data: { profile },
     });
   } catch (error) {
+    console.error("🛑 [BACKEND] Error in rejectTutorProfile:", error.message);
+    console.error("🛑 [BACKEND] Error stack:", error.stack);
     next(error);
   }
 };
