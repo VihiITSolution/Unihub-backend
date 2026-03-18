@@ -488,7 +488,7 @@ router.get(
  * /api/admin/tutor-profiles:
  *   get:
  *     tags: [Admin]
- *     summary: Get all tutor profiles with filters (Admin only)
+ *     summary: Get all tutor profiles (Admin only)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -496,6 +496,7 @@ router.get(
  *         name: approvalStatus
  *         schema:
  *           type: string
+ *           enum: [pending, approved, rejected]
  *       - in: query
  *         name: page
  *         schema:
