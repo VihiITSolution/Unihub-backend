@@ -72,6 +72,11 @@ jobs:
               -e CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }} \
               -e CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }} \
               -e CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }} \
+              -e YOUTUBE_CLIENT_ID=${{ secrets.YOUTUBE_CLIENT_ID }} \
+              -e YOUTUBE_CLIENT_SECRET=${{ secrets.YOUTUBE_CLIENT_SECRET }} \
+              -e YOUTUBE_JAVASCRIPT_ORIGIN=${{ secrets.YOUTUBE_JAVASCRIPT_ORIGIN }} \
+              -e YOUTUBE_REDIRECT_URI=${{ secrets.YOUTUBE_REDIRECT_URI }} \
+              -e YOUTUBE_REDIRECT_URI_LOCAL=${{ secrets.YOUTUBE_REDIRECT_URI_LOCAL }} \
               ${{ secrets.DOCKER_USERNAME }}/unihub-backend:latest
 
             # Clean up old images
