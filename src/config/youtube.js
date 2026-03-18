@@ -25,7 +25,7 @@ class YouTubeUploader {
   }
 
   /**
-   * Ensure OAuth2 client is initialized from credentials file.
+   * Ensure OAuth2 client is initialized from env or credentials file.
    * This is used by auth URL generation and callback exchange paths.
    */
   ensureOAuthClient() {
@@ -33,21 +33,40 @@ class YouTubeUploader {
       return true;
     }
 
-    const credentialsPath = path.join(__dirname, "youtube-credentials.json");
+    // 1) Prefer env-based secrets for production deployments.
+    let client_id = process.env.YOUTUBE_CLIENT_ID;
+    let client_secret = process.env.YOUTUBE_CLIENT_SECRET;
+    let redirect_uris = [];
 
-    if (!fs.existsSync(credentialsPath)) {
-      throw new Error(
-        "YouTube credentials not found at src/config/youtube-credentials.json",
-      );
+    const preferredEnvRedirectUri =
+      process.env.NODE_ENV === "production"
+        ? process.env.YOUTUBE_REDIRECT_URI
+        : process.env.YOUTUBE_REDIRECT_URI_LOCAL ||
+          process.env.YOUTUBE_REDIRECT_URI;
+
+    if (preferredEnvRedirectUri) {
+      redirect_uris.push(preferredEnvRedirectUri);
     }
 
-    const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
-    const { client_secret, client_id, redirect_uris } =
-      credentials.installed || credentials.web || {};
+    // 2) Fallback to credentials file if any env values are missing.
+    if (!client_id || !client_secret || redirect_uris.length === 0) {
+      const credentialsPath = path.join(__dirname, "youtube-credentials.json");
+
+      if (fs.existsSync(credentialsPath)) {
+        const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf8"));
+        const jsonConfig = credentials.installed || credentials.web || {};
+
+        client_id = client_id || jsonConfig.client_id;
+        client_secret = client_secret || jsonConfig.client_secret;
+        if (redirect_uris.length === 0 && Array.isArray(jsonConfig.redirect_uris)) {
+          redirect_uris = jsonConfig.redirect_uris;
+        }
+      }
+    }
 
     if (!client_id || !client_secret) {
       throw new Error(
-        "Invalid YouTube credentials format. Missing client_id or client_secret.",
+        "Missing YouTube OAuth client_id or client_secret. Set YOUTUBE_CLIENT_ID/YOUTUBE_CLIENT_SECRET or provide youtube-credentials.json.",
       );
     }
 
