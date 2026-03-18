@@ -1,10 +1,10 @@
-const express = require("express");
-const {
-  getAllUsers,
-  updateUserStatus,
-  deleteUser,
-  getStatistics,
-  getAllCourses,
+const express = require('express');
+const { 
+  getAllUsers, 
+  updateUserStatus, 
+  deleteUser, 
+  getStatistics, 
+  getAllCourses, 
   getAllMarketplaceItems,
   getPendingCourses,
   approveCourse,
@@ -277,12 +277,7 @@ router.get(
  *       200:
  *         description: List of pending courses
  */
-router.get(
-  "/courses/pending",
-  authMiddleware,
-  authorize("admin"),
-  getPendingCourses,
-);
+router.get('/courses/pending', authMiddleware, authorize('admin'), getPendingCourses);
 
 /**
  * @swagger
@@ -302,12 +297,7 @@ router.get(
  *       200:
  *         description: Course approved
  */
-router.put(
-  "/courses/:id/approve",
-  authMiddleware,
-  authorize("admin"),
-  approveCourse,
-);
+router.put('/courses/:id/approve', authMiddleware, authorize('admin'), approveCourse);
 
 /**
  * @swagger
@@ -337,12 +327,7 @@ router.put(
  *       200:
  *         description: Course rejected
  */
-router.put(
-  "/courses/:id/reject",
-  authMiddleware,
-  authorize("admin"),
-  rejectCourse,
-);
+router.put('/courses/:id/reject', authMiddleware, authorize('admin'), rejectCourse);
 
 /**
  * @swagger
@@ -362,12 +347,7 @@ router.put(
  *       200:
  *         description: Course details with tutor profile
  */
-router.get(
-  "/courses/:id/details",
-  authMiddleware,
-  authorize("admin"),
-  getCourseDetails,
-);
+router.get('/courses/:id/details', authMiddleware, authorize('admin'), getCourseDetails);
 
 /**
  * @swagger
@@ -390,12 +370,7 @@ router.get(
  *       200:
  *         description: List of pending marketplace items
  */
-router.get(
-  "/marketplace/pending",
-  authMiddleware,
-  authorize("admin"),
-  getPendingMarketplaceItems,
-);
+router.get('/marketplace/pending', authMiddleware, authorize('admin'), getPendingMarketplaceItems);
 
 /**
  * @swagger
@@ -415,12 +390,7 @@ router.get(
  *       200:
  *         description: Marketplace item approved
  */
-router.put(
-  "/marketplace/:id/approve",
-  authMiddleware,
-  authorize("admin"),
-  approveMarketplaceItem,
-);
+router.put('/marketplace/:id/approve', authMiddleware, authorize('admin'), approveMarketplaceItem);
 
 /**
  * @swagger
@@ -448,12 +418,7 @@ router.put(
  *       200:
  *         description: Marketplace item rejected
  */
-router.put(
-  "/marketplace/:id/reject",
-  authMiddleware,
-  authorize("admin"),
-  rejectMarketplaceItem,
-);
+router.put('/marketplace/:id/reject', authMiddleware, authorize('admin'), rejectMarketplaceItem);
 
 /**
  * @swagger
@@ -476,70 +441,7 @@ router.put(
  *       200:
  *         description: List of pending bank transfers
  */
-router.get(
-  "/payments/bank-transfers/pending",
-  authMiddleware,
-  authorize("admin"),
-  getPendingBankTransfers,
-);
-
-/**
- * @swagger
- * /api/admin/tutor-profiles:
- *   get:
- *     tags: [Admin]
- *     summary: Get all tutor profiles (Admin only)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: approvalStatus
- *         schema:
- *           type: string
- *           enum: [pending, approved, rejected]
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: List of tutor profiles
- */
-router.get(
-  "/tutor-profiles",
-  authMiddleware,
-  authorize("admin"),
-  getAllTutorProfiles,
-);
-
-/**
- * @swagger
- * /api/admin/tutor-profiles/{id}:
- *   get:
- *     tags: [Admin]
- *     summary: Get tutor profile details (Admin only)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Tutor profile details
- */
-router.get(
-  "/tutor-profiles/:id",
-  authMiddleware,
-  authorize("admin"),
-  getTutorProfileDetails,
-);
+router.get('/payments/bank-transfers/pending', authMiddleware, authorize('admin'), getPendingBankTransfers);
 
 /**
  * @swagger

@@ -15,7 +15,6 @@ const BoardingPlace = require("./BoardingPlace");
 const Review = require("./Review");
 const Faculty = require("./Faculty");
 const University = require("./University");
-const Notification = require("./Notification");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -160,10 +159,6 @@ Review.belongsTo(User, { foreignKey: "userId", as: "user" });
 Course.hasMany(Review, { foreignKey: "courseId", as: "reviews" });
 Review.belongsTo(Course, { foreignKey: "courseId", as: "course" });
 
-// Notification relationships
-User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
-Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
-
 module.exports = {
   sequelize,
   User,
@@ -182,5 +177,4 @@ module.exports = {
   Review,
   Faculty,
   University,
-  Notification,
 };

@@ -494,7 +494,7 @@ const getPendingMarketplaceItems = async (req, res, next) => {
 
     const where = {
       isPaid: true, // Only show items that have been paid for
-      approvalStatus: "pending",
+      approvalStatus: 'pending'
     };
 
     const offset = (page - 1) * limit;
@@ -553,14 +553,14 @@ const approveMarketplaceItem = async (req, res, next) => {
       });
     }
 
-    if (item.approvalStatus !== "pending") {
+    if (item.approvalStatus !== 'pending') {
       return res.status(400).json({
         success: false,
         message: `Cannot approve item with status: ${item.approvalStatus}`,
       });
     }
 
-    item.approvalStatus = "approved";
+    item.approvalStatus = 'approved';
     item.approvedBy = req.user.id;
     item.approvedAt = new Date();
     item.isAvailable = true; // Make available when approved
@@ -594,20 +594,17 @@ const rejectMarketplaceItem = async (req, res, next) => {
       });
     }
 
-    if (
-      item.approvalStatus !== "pending" &&
-      item.approvalStatus !== "approved"
-    ) {
+    if (item.approvalStatus !== 'pending' && item.approvalStatus !== 'approved') {
       return res.status(400).json({
         success: false,
         message: `Cannot reject item with status: ${item.approvalStatus}`,
       });
     }
 
-    item.approvalStatus = "rejected";
+    item.approvalStatus = 'rejected';
     item.approvedBy = req.user.id;
     item.approvedAt = new Date();
-    item.rejectionReason = reason || "No reason provided";
+    item.rejectionReason = reason || 'No reason provided';
     item.isAvailable = false;
 
     await item.save();
@@ -630,8 +627,8 @@ const getPendingBankTransfers = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query;
 
     const where = {
-      paymentMethod: "bank_transfer",
-      status: "pending",
+      paymentMethod: 'bank_transfer',
+      status: 'pending'
     };
 
     const offset = (page - 1) * limit;

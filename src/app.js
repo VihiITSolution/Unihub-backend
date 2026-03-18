@@ -21,8 +21,6 @@ const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const universityRoutes = require("./routes/universityRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 
@@ -37,33 +35,11 @@ app.use(helmet());
 // CORS configuration
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(",")
-  : ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"];
+  : ["http://localhost:3000", "http://localhost:3001"];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, server-to-server)
-      if (!origin) return callback(null, true);
-
-      // Allow if in the allowed list
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        return callback(null, true);
-      }
-
-      // Allow any origin that is the same host (different port) as the server
-      // This handles cases where admin/frontend is on same IP but different port
-      if (process.env.NODE_ENV === "production") {
-        // In production, allow all origins from the same server IP
-        const serverHost = process.env.DO_HOST || "";
-        if (serverHost && origin.includes(serverHost)) {
-          return callback(null, true);
-        }
-        // Allow any http/https origin in production (API is protected by JWT anyway)
-        return callback(null, true);
-      }
-
-      callback(new Error("Not allowed by CORS"));
-    },
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -114,13 +90,11 @@ app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/youtube", youtubeRoutes);
 app.use("/api/live-sessions", liveSessionRoutes);
-app.use("/api/profile", profileRoutes);
 app.use("/api/profile/vendor", vendorRoutes);
 app.use("/api/boarding", boardingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/faculties", facultyRoutes);
 app.use("/api/universities", universityRoutes);
-app.use("/api/notifications", notificationRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {
