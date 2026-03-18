@@ -77,8 +77,8 @@ jobs:
               -e YOUTUBE_JAVASCRIPT_ORIGIN=${{ secrets.YOUTUBE_JAVASCRIPT_ORIGIN }} \
               -e YOUTUBE_REDIRECT_URI=${{ secrets.YOUTUBE_REDIRECT_URI }} \
               -e YOUTUBE_REDIRECT_URI_LOCAL=${{ secrets.YOUTUBE_REDIRECT_URI_LOCAL }} \
-              -e YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }} \
-              -e YOUTUBE_ACCESS_TOKEN: ${{ secrets.YOUTUBE_ACCESS_TOKEN }} \
+              -e YOUTUBE_REFRESH_TOKEN = ${{ secrets.YOUTUBE_REFRESH_TOKEN }} \
+              -e YOUTUBE_ACCESS_TOKEN = ${{ secrets.YOUTUBE_ACCESS_TOKEN }} \
               ${{ secrets.DOCKER_USERNAME }}/unihub-backend:latest
 
             # Clean up old images
