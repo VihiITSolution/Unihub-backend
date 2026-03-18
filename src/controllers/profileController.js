@@ -288,12 +288,25 @@ const reviewTutorApplication = async (req, res, next) => {
       });
 
       // Add tutor role to user if not already present
-      const user = profile.user;
-      if (!user.roles.includes("tutor")) {
-        user.roles = [...user.roles, "tutor"];
-        user.isTutorProfileComplete = true;
-        await user.save();
+      const user = profile.user || (await User.findByPk(profile.userId));
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found for tutor profile",
+        });
       }
+
+      const currentRoles = Array.isArray(user.roles) ? user.roles : [];
+      if (!currentRoles.includes("tutor")) {
+        user.roles = [...currentRoles, "tutor"];
+      }
+
+      user.isTutorProfileComplete = true;
+      if (user.primaryRole !== "tutor") {
+        user.primaryRole = "tutor";
+      }
+
+      await user.save();
 
       // Create notification for user (don't let notification failure break the flow)
       try {
