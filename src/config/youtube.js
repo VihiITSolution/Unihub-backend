@@ -22,6 +22,7 @@ class YouTubeUploader {
     this.oauth2Client = null;
     this.youtube = null;
     this.initialized = false;
+    this.allowLocalFallback = process.env.YOUTUBE_ALLOW_LOCAL_FALLBACK === "true";
   }
 
   /**
@@ -194,13 +195,22 @@ class YouTubeUploader {
    */
   async uploadVideo(filePath, title, description = "") {
     if (!this.initialized) {
-      // Fallback: Return local file path if YouTube API is not configured
-      console.warn("⚠️  YouTube API not configured, storing video locally");
-      console.warn("Videos stored locally won't be visible in the UI.");
-      console.warn(
-        "Please run: node setup-youtube.js to configure YouTube integration",
-      );
-      return `/uploads/videos/${path.basename(filePath)}`;
+      // Try to recover from a stale startup state (e.g., env/token became available after boot).
+      await this.initialize();
+    }
+
+    if (!this.initialized) {
+      const notReadyMessage =
+        "YouTube API not initialized. Check credentials/token and complete OAuth authorization.";
+
+      if (this.allowLocalFallback) {
+        console.warn("⚠️  YouTube API not configured, storing video locally");
+        console.warn("Videos stored locally won't be visible in the UI.");
+        console.warn(notReadyMessage);
+        return `/uploads/videos/${path.basename(filePath)}`;
+      }
+
+      throw new Error(notReadyMessage);
     }
 
     try {
@@ -245,16 +255,34 @@ class YouTubeUploader {
 
       return youtubeUrl;
     } catch (error) {
-      console.error("❌ YouTube upload failed:", error.message);
-      if (error.code === 401 || error.code === 403) {
+      const apiError = error?.response?.data?.error;
+      const detailedMessage =
+        apiError?.message ||
+        apiError?.errors?.[0]?.message ||
+        error.message ||
+        "Unknown YouTube upload error";
+
+      console.error("❌ YouTube upload failed:", detailedMessage);
+
+      const authFailed =
+        error.code === 401 ||
+        error.code === 403 ||
+        detailedMessage.toLowerCase().includes("invalid_grant") ||
+        detailedMessage.toLowerCase().includes("auth");
+
+      if (authFailed) {
         console.error("   Authentication error. Please re-authorize the app.");
         console.error("   Run: node setup-youtube.js");
       }
-      console.error(
-        "   Falling back to local storage (video won't be visible in UI)",
-      );
-      // Return local path as fallback
-      return `/uploads/videos/${path.basename(filePath)}`;
+
+      if (this.allowLocalFallback) {
+        console.error(
+          "   Falling back to local storage (video won't be visible in UI)",
+        );
+        return `/uploads/videos/${path.basename(filePath)}`;
+      }
+
+      throw new Error(`YouTube upload failed: ${detailedMessage}`);
     }
   }
 

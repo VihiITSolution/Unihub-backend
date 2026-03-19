@@ -57,7 +57,7 @@ const addCourseContent = async (req, res, next) => {
         console.error("YouTube upload failed:", uploadError);
         return res.status(500).json({
           success: false,
-          message: "Failed to upload video to YouTube. Please try again.",
+          message: uploadError.message || "Failed to upload video to YouTube. Please try again.",
         });
       }
     } else if (req.body.url) {
