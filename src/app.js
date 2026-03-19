@@ -71,8 +71,8 @@ app.use(
 );
 
 // Body parser middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "5gb" }));
+app.use(express.urlencoded({ extended: true, limit: "5gb" }));
 
 // Apply rate limiting to all API routes
 app.use("/api", apiLimiter);
