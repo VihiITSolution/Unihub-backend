@@ -20,8 +20,9 @@ router.post(
   authMiddleware,
   authorize("tutor", "admin"),
   (req, res, next) => {
-    // Use appropriate upload middleware based on type
-    const type = req.body.type || req.query.type;
+    // For multipart/form-data, req.body may not be populated before multer runs.
+    // Prefer query type and safely fall back to body when present.
+    const type = String(req.query?.type || req.body?.type || "").toLowerCase();
     if (type === "pdf") {
       uploadPDF(req, res, next);
     } else {
