@@ -35,9 +35,9 @@ if (process.env.NODE_ENV === "production") {
 app.use(helmet());
 
 // CORS configuration
-const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",")
-  : ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"];
+const allowedOrigins = process.env.ALLOWED_FRONTEND_ORIGINS
+  ? process.env.ALLOWED_FRONTEND_ORIGINS.split(",").map(origin => origin.trim())
+  : ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://unihub-frontend:3000"];
 
 app.use(
   cors({

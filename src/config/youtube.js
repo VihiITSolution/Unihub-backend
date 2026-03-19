@@ -73,7 +73,8 @@ class YouTubeUploader {
 
     const redirectUri =
       (redirect_uris && redirect_uris[0]) ||
-      "http://localhost:5000/api/youtube/oauth2callback";
+      process.env.YOUTUBE_REDIRECT_URI_LOCAL ||
+      "http://unihub-backend:3000/api/youtube/oauth2callback";
 
     this.oauth2Client = new google.auth.OAuth2(
       client_id,
