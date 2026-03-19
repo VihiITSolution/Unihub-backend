@@ -89,6 +89,7 @@ class YouTubeUploader {
   async initialize() {
     try {
       const tokenPath = path.join(__dirname, "youtube-token.json");
+      let token = null;
 
       try {
         this.ensureOAuthClient();
@@ -101,9 +102,33 @@ class YouTubeUploader {
         return false;
       }
 
+      // Prefer refresh token from environment in production/container deployments.
+      if (process.env.YOUTUBE_REFRESH_TOKEN) {
+        token = {
+          refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
+        };
+
+        if (process.env.YOUTUBE_ACCESS_TOKEN) {
+          token.access_token = process.env.YOUTUBE_ACCESS_TOKEN;
+        }
+
+        if (process.env.YOUTUBE_TOKEN_EXPIRY_DATE) {
+          token.expiry_date = Number(process.env.YOUTUBE_TOKEN_EXPIRY_DATE);
+        }
+
+        if (process.env.YOUTUBE_TOKEN_SCOPE) {
+          token.scope = process.env.YOUTUBE_TOKEN_SCOPE;
+        }
+
+        if (process.env.YOUTUBE_TOKEN_TYPE) {
+          token.token_type = process.env.YOUTUBE_TOKEN_TYPE;
+        }
+      } else if (fs.existsSync(tokenPath)) {
+        token = JSON.parse(fs.readFileSync(tokenPath, "utf8"));
+      }
+
       // Check if token exists
-      if (fs.existsSync(tokenPath)) {
-        const token = JSON.parse(fs.readFileSync(tokenPath, "utf8"));
+      if (token) {
         this.oauth2Client.setCredentials(token);
 
         // Set up automatic token refresh
@@ -114,13 +139,15 @@ class YouTubeUploader {
           }
           if (tokens.access_token) {
             console.log("Access token refreshed");
-            // Update the token file
+            // Update the token file when available for local/dev setups.
             const updatedToken = {
               ...token,
               access_token: tokens.access_token,
               expiry_date: tokens.expiry_date,
             };
-            fs.writeFileSync(tokenPath, JSON.stringify(updatedToken, null, 2));
+            if (fs.existsSync(tokenPath)) {
+              fs.writeFileSync(tokenPath, JSON.stringify(updatedToken, null, 2));
+            }
           }
         });
 
@@ -146,7 +173,7 @@ class YouTubeUploader {
         return true;
       } else {
         console.warn(
-          "YouTube token not found. Please complete OAuth flow first.",
+          "YouTube token not found. Set YOUTUBE_REFRESH_TOKEN or complete OAuth flow first.",
         );
         this.initialized = false;
         return false;

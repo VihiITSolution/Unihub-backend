@@ -15,7 +15,7 @@ const {
   rejectMarketplaceItem,
   getPendingBankTransfers,
   getAllTutorProfiles,
-  getTutorProfileDetails,
+  getTutorProfileDetails, 
   approveTutorProfile,
   rejectTutorProfile,
 } = require("../controllers/adminController");
