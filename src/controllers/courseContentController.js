@@ -3,6 +3,47 @@ const youtubeUploader = require("../config/youtube");
 const path = require("path");
 const fs = require("fs");
 
+const extractYouTubeVideoId = (url = "") => {
+  if (!url) return null;
+
+  if (url.includes("youtube.com/watch?v=")) {
+    return url.split("v=")[1]?.split("&")[0] || null;
+  }
+
+  if (url.includes("youtu.be/")) {
+    return url.split("youtu.be/")[1]?.split("?")[0] || null;
+  }
+
+  if (url.includes("youtube.com/embed/")) {
+    return url.split("/embed/")[1]?.split("?")[0] || null;
+  }
+
+  return null;
+};
+
+const buildPrivacyEmbedUrl = (videoId) => {
+  if (!videoId) return null;
+  return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0`;
+};
+
+const sanitizeContentForClient = (content) => {
+  const raw = content?.toJSON ? content.toJSON() : content;
+  if (!raw) return raw;
+
+  if (raw.type === "video") {
+    const videoId = raw.youtubeVideoId || extractYouTubeVideoId(raw.url);
+    const embedUrl = buildPrivacyEmbedUrl(videoId);
+
+    return {
+      ...raw,
+      youtubeVideoId: videoId || raw.youtubeVideoId || null,
+      url: embedUrl || raw.url,
+    };
+  }
+
+  return raw;
+};
+
 /**
  * Add content to a course (video lesson or PDF)
  * Videos are automatically uploaded to YouTube as unlisted
@@ -51,7 +92,7 @@ const addCourseContent = async (req, res, next) => {
           youtubeVideoId = youtubeUrl.split("youtu.be/")[1]?.split("?")[0];
         }
 
-        url = youtubeUrl;
+        url = buildPrivacyEmbedUrl(youtubeVideoId) || youtubeUrl;
         console.log("Video uploaded to YouTube:", youtubeUrl);
       } catch (uploadError) {
         console.error("YouTube upload failed:", uploadError);
@@ -87,7 +128,7 @@ const addCourseContent = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: "Course content added successfully",
-      data: { content },
+      data: { content: sanitizeContentForClient(content) },
     });
   } catch (error) {
     next(error);
@@ -110,7 +151,9 @@ const getCourseContent = async (req, res, next) => {
     });
 
     // Filter out any invalid content without type
-    const validContents = contents.filter((content) => content.type);
+    const validContents = contents
+      .filter((content) => content.type)
+      .map((content) => sanitizeContentForClient(content));
 
     res.status(200).json({
       success: true,
@@ -223,7 +266,7 @@ const getContentById = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: { content },
+      data: { content: sanitizeContentForClient(content) },
     });
   } catch (error) {
     next(error);
