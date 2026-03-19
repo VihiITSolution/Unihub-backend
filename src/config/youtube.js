@@ -110,10 +110,6 @@ class YouTubeUploader {
           refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
         };
 
-        if (process.env.YOUTUBE_ACCESS_TOKEN) {
-          token.access_token = process.env.YOUTUBE_ACCESS_TOKEN;
-        }
-
         if (process.env.YOUTUBE_TOKEN_EXPIRY_DATE) {
           token.expiry_date = Number(process.env.YOUTUBE_TOKEN_EXPIRY_DATE);
         }
@@ -220,6 +216,14 @@ class YouTubeUploader {
         `Uploading video to YouTube: ${title} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`,
       );
 
+      // Always refresh access token from refresh token before upload to avoid stale/invalid credentials.
+      if (this.oauth2Client?.credentials?.refresh_token) {
+        this.oauth2Client.setCredentials({
+          refresh_token: this.oauth2Client.credentials.refresh_token,
+        });
+        await this.oauth2Client.getAccessToken();
+      }
+
       const response = await this.youtube.videos.insert({
         part: ["snippet", "status"],
         requestBody: {
@@ -269,7 +273,52 @@ class YouTubeUploader {
         error.code === 401 ||
         error.code === 403 ||
         detailedMessage.toLowerCase().includes("invalid_grant") ||
-        detailedMessage.toLowerCase().includes("auth");
+        detailedMessage.toLowerCase().includes("auth") ||
+        detailedMessage.toLowerCase().includes("invalid authentication credentials");
+
+      // Retry once after forcing token refresh for recoverable auth failures.
+      if (authFailed && this.oauth2Client?.credentials?.refresh_token) {
+        try {
+          this.oauth2Client.setCredentials({
+            refresh_token: this.oauth2Client.credentials.refresh_token,
+          });
+          await this.oauth2Client.getAccessToken();
+
+          const retryResponse = await this.youtube.videos.insert({
+            part: ["snippet", "status"],
+            requestBody: {
+              snippet: {
+                title: title,
+                description: description,
+                categoryId: "27",
+              },
+              status: {
+                privacyStatus: "unlisted",
+                embeddable: true,
+              },
+            },
+            media: {
+              body: fs.createReadStream(filePath),
+            },
+          });
+
+          const retryVideoId = retryResponse.data.id;
+          const retryYoutubeUrl = `https://www.youtube.com/watch?v=${retryVideoId}`;
+          console.log(`✅ Video uploaded to YouTube successfully after token refresh: ${retryYoutubeUrl}`);
+
+          try {
+            fs.unlinkSync(filePath);
+          } catch (deleteError) {
+            console.warn(`Warning: Could not delete local file: ${deleteError.message}`);
+          }
+
+          return retryYoutubeUrl;
+        } catch (retryError) {
+          const retryMessage =
+            retryError?.response?.data?.error?.message || retryError.message || detailedMessage;
+          console.error("Retry after token refresh failed:", retryMessage);
+        }
+      }
 
       if (authFailed) {
         console.error("   Authentication error. Please re-authorize the app.");

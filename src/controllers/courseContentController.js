@@ -10,7 +10,7 @@ const fs = require("fs");
 const addCourseContent = async (req, res, next) => {
   try {
     const { courseId } = req.params;
-    const { title, type, duration, order } = req.body;
+    const { title, type, duration, order } = req.body || {};
 
     // Validate required fields
     if (!title || !type) {
