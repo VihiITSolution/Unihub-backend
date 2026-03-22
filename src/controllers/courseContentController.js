@@ -51,7 +51,7 @@ const sanitizeContentForClient = (content) => {
 const addCourseContent = async (req, res, next) => {
   try {
     const { courseId } = req.params;
-    const { title, type, duration, order } = req.body || {};
+    const { title, type, duration, order, isPreview } = req.body || {};
 
     // Validate required fields
     if (!title || !type) {
@@ -98,7 +98,9 @@ const addCourseContent = async (req, res, next) => {
         console.error("YouTube upload failed:", uploadError);
         return res.status(500).json({
           success: false,
-          message: uploadError.message || "Failed to upload video to YouTube. Please try again.",
+          message:
+            uploadError.message ||
+            "Failed to upload video to YouTube. Please try again.",
         });
       }
     } else if (req.body.url) {
@@ -123,6 +125,7 @@ const addCourseContent = async (req, res, next) => {
       youtubeVideoId,
       duration: duration || null,
       order: order || 0,
+      isPreview: isPreview === "true" || isPreview === true ? true : false,
     });
 
     res.status(201).json({
@@ -170,7 +173,7 @@ const getCourseContent = async (req, res, next) => {
 const updateCourseContent = async (req, res, next) => {
   try {
     const { contentId } = req.params;
-    const { title, url, duration, order, isPublished } = req.body;
+    const { title, url, duration, order, isPublished, isPreview } = req.body;
 
     const content = await CourseContent.findByPk(contentId);
 
@@ -186,6 +189,9 @@ const updateCourseContent = async (req, res, next) => {
     if (duration !== undefined) content.duration = duration;
     if (order !== undefined) content.order = order;
     if (isPublished !== undefined) content.isPublished = isPublished;
+    if (isPreview !== undefined)
+      content.isPreview =
+        isPreview === "true" || isPreview === true ? true : false;
 
     await content.save();
 

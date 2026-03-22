@@ -51,12 +51,19 @@ const CourseContent = sequelize.define(
       defaultValue: true,
       field: "is_published",
     },
+    isPreview: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_preview",
+      comment:
+        "Whether this material can be previewed by non-enrolled students",
+    },
   },
   {
     tableName: "course_contents",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 module.exports = CourseContent;

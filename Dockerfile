@@ -23,5 +23,9 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the application
-CMD ["node", "src/server.js"]
+# Create startup script that runs migrations then starts app
+RUN echo '#!/bin/sh\nset -e\necho "Running database migrations..."\nnode src/migrations/migrate.js\necho "Starting application..."\nnode src/server.js' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Start the application with migrations
+CMD ["/app/start.sh"]
