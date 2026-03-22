@@ -24,4 +24,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
-CMD ["sh", "-c", "node src/migrations/migrate.js && node src/server.js"]
+CMD ["node", "src/server.js"]
