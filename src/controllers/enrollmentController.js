@@ -91,7 +91,7 @@ const getMyEnrollments = async (req, res, next) => {
 const updateProgress = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { progress, status } = req.body;
+    const { progress, status, completedContents } = req.body;
 
     const enrollment = await Enrollment.findByPk(id);
 
@@ -111,6 +111,11 @@ const updateProgress = async (req, res, next) => {
 
     if (progress !== undefined) enrollment.progress = progress;
     if (status) enrollment.status = status;
+    if (completedContents !== undefined) {
+      enrollment.completedContents = Array.isArray(completedContents)
+        ? completedContents
+        : [];
+    }
 
     if (status === "completed") {
       enrollment.completedAt = new Date();

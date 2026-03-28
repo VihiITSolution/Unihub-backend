@@ -128,6 +128,48 @@ router.put(
 
 /**
  * @swagger
+ * /api/enrollments/{id}:
+ *   patch:
+ *     tags: [Enrollments]
+ *     summary: Update enrollment (progress and completed contents)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               progress:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 100
+ *               completedContents:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *               status:
+ *                 type: string
+ *                 enum: [enrolled, in_progress, completed, cancelled]
+ *     responses:
+ *       200:
+ *         description: Enrollment updated successfully
+ */
+router.patch(
+  "/:id",
+  authMiddleware,
+  authorize("student", "admin"),
+  updateProgress,
+);
+
+/**
+ * @swagger
  * /api/enrollments/{id}/cancel:
  *   put:
  *     tags: [Enrollments]
