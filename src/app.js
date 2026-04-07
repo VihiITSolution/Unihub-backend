@@ -23,6 +23,7 @@ const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
 const universityRoutes = require("./routes/universityRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 
 const app = express();
 
@@ -36,8 +37,15 @@ app.use(helmet());
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_FRONTEND_ORIGINS
-  ? process.env.ALLOWED_FRONTEND_ORIGINS.split(",").map(origin => origin.trim())
-  : ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://unihub-frontend:3000"];
+  ? process.env.ALLOWED_FRONTEND_ORIGINS.split(",").map((origin) =>
+      origin.trim(),
+    )
+  : [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://unihub-frontend:3000",
+    ];
 
 app.use(
   cors({
@@ -108,6 +116,7 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api", courseContentRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/marketplace", marketplaceRoutes);

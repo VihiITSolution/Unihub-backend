@@ -1,4 +1,4 @@
-const { Course, User, Enrollment } = require("../models");
+const { Course, User, Enrollment, Category } = require("../models");
 const { Op } = require("sequelize");
 
 /**
@@ -9,7 +9,10 @@ const createCourse = async (req, res, next) => {
     const {
       title,
       description,
+      shortDescription,
+      aboutCourse,
       category,
+      categoryId,
       level,
       price,
       duration,
@@ -20,11 +23,25 @@ const createCourse = async (req, res, next) => {
     // Handle thumbnail from file upload
     const thumbnail = req.file ? req.file.path : null;
 
+    // Use new categoryId if provided, otherwise fallback to legacy category field
+    let finalCategoryId = categoryId;
+
+    if (!finalCategoryId && category) {
+      // Try to find category by name for backward compatibility
+      const categoryRecord = await Category.findOne({
+        where: { name: category },
+      });
+      finalCategoryId = categoryRecord?.id;
+    }
+
     const course = await Course.create({
       tutorId: req.user.id,
       title,
       description,
-      category,
+      shortDescription: shortDescription || null,
+      aboutCourse: aboutCourse || null,
+      categoryId: finalCategoryId || null,
+      category: category || null, // Keep for backward compatibility
       level,
       price,
       duration,
@@ -95,6 +112,12 @@ const getCourses = async (req, res, next) => {
           as: "faculty",
           attributes: ["id", "name", "icon", "description"],
         },
+        {
+          model: require("../models").Category,
+          as: "categoryObj",
+          attributes: ["id", "name", "slug", "description", "icon"],
+          required: false,
+        },
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
@@ -141,6 +164,12 @@ const getCourseById = async (req, res, next) => {
           model: require("../models/Faculty"),
           as: "faculty",
           attributes: ["id", "name", "icon", "description"],
+        },
+        {
+          model: require("../models").Category,
+          as: "categoryObj",
+          attributes: ["id", "name", "slug", "description", "icon"],
+          required: false,
         },
       ],
     });
