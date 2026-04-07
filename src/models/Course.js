@@ -1,3 +1,4 @@
+// ...existing code...
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/sequelize");
 
@@ -26,12 +27,17 @@ const Course = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    shortDescription: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: "short_description",
+      comment: "Brief summary for course listings",
+    },
     aboutCourse: {
       type: DataTypes.TEXT,
       allowNull: true,
       field: "about_course",
-      comment:
-        "Detailed course information including lessons, learning points, difficulty level, etc.",
+      comment: "Detailed course information (syllabus, learning points, etc.)",
     },
     category: {
       type: DataTypes.INTEGER,
