@@ -172,8 +172,8 @@ User.hasMany(Category, {
 });
 Category.belongsTo(User, { foreignKey: "createdByTutorId", as: "creator" });
 
-Course.belongsTo(Category, { foreignKey: "categoryId", as: "categoryObj" });
-Category.hasMany(Course, { foreignKey: "categoryId", as: "courses" });
+Course.belongsTo(Category, { foreignKey: "category", as: "categoryObj" });
+Category.hasMany(Course, { foreignKey: "category", as: "courses" });
 
 module.exports = {
   sequelize,

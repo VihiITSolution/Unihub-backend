@@ -12,7 +12,7 @@ const createCourse = async (req, res, next) => {
       shortDescription,
       aboutCourse,
       category,
-      categoryId,
+      category,
       level,
       price,
       duration,
@@ -23,15 +23,14 @@ const createCourse = async (req, res, next) => {
     // Handle thumbnail from file upload
     const thumbnail = req.file ? req.file.path : null;
 
-    // Use new categoryId if provided, otherwise fallback to legacy category field
-    let finalCategoryId = categoryId;
-
-    if (!finalCategoryId && category) {
+    // Use category as the foreign key
+    let finalCategory = category;
+    if (!finalCategory && category) {
       // Try to find category by name for backward compatibility
       const categoryRecord = await Category.findOne({
         where: { name: category },
       });
-      finalCategoryId = categoryRecord?.id;
+      finalCategory = categoryRecord?.id;
     }
 
     const course = await Course.create({
@@ -40,8 +39,7 @@ const createCourse = async (req, res, next) => {
       description,
       shortDescription: shortDescription || null,
       aboutCourse: aboutCourse || null,
-      categoryId: finalCategoryId || null,
-      category: category || null, // Keep for backward compatibility
+      category: finalCategory || null,
       level,
       price,
       duration,

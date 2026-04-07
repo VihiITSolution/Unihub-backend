@@ -39,10 +39,10 @@ const Course = sequelize.define(
       comment:
         "Detailed course information including lessons, learning points, difficulty level, etc.",
     },
-    categoryId: {
+    category: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      field: "category_id",
+      field: "category",
       references: {
         model: "categories",
         key: "id",
