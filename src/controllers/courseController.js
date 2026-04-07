@@ -12,7 +12,6 @@ const createCourse = async (req, res, next) => {
       shortDescription,
       aboutCourse,
       category,
-      category,
       level,
       price,
       duration,
