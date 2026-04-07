@@ -26,12 +26,6 @@ const Course = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
-    shortDescription: {
-      type: DataTypes.STRING(500),
-      allowNull: true,
-      field: "short_description",
-      comment: "Brief description shown on course listings",
-    },
     aboutCourse: {
       type: DataTypes.TEXT,
       allowNull: true,

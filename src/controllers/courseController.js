@@ -9,7 +9,6 @@ const createCourse = async (req, res, next) => {
     const {
       title,
       description,
-      shortDescription,
       aboutCourse,
       category,
       level,
@@ -36,7 +35,6 @@ const createCourse = async (req, res, next) => {
       tutorId: req.user.id,
       title,
       description,
-      shortDescription: shortDescription || null,
       aboutCourse: aboutCourse || null,
       category: finalCategory || null,
       level,

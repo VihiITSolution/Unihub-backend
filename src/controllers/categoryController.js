@@ -208,7 +208,6 @@ const getCategoryWithCourses = async (req, res, next) => {
           attributes: [
             "id",
             "title",
-            "shortDescription",
             "thumbnail",
             "price",
             "rating",
