@@ -139,6 +139,13 @@ const Course = sequelize.define(
       type: DataTypes.DATE,
       field: "submitted_for_review_at",
     },
+    isUpcoming: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_upcoming",
+      comment:
+        "Mark course as upcoming - students can enroll but cannot access content",
+    },
   },
   {
     tableName: "courses",
