@@ -9,6 +9,7 @@ const {
 } = require("../models");
 const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
+const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
 
 /**
  * Get all users (Admin only)
@@ -493,7 +494,8 @@ const getPendingMarketplaceItems = async (req, res, next) => {
     const { page = 1, limit = 10 } = req.query;
 
     const where = {
-      isPaid: true, // Only show items that have been paid for
+      // Include paid items AND free trial ads awaiting review
+      [Op.or]: [{ isPaid: true }, { isFreeTrialAd: true }],
       approvalStatus: "pending",
     };
 
@@ -546,7 +548,7 @@ const approveMarketplaceItem = async (req, res, next) => {
       });
     }
 
-    if (!item.isPaid) {
+    if (!item.isPaid && !item.isFreeTrialAd) {
       return res.status(400).json({
         success: false,
         message: "Item must be paid before approval",
@@ -563,7 +565,12 @@ const approveMarketplaceItem = async (req, res, next) => {
     item.approvalStatus = "approved";
     item.approvedBy = req.user.id;
     item.approvedAt = new Date();
-    item.isAvailable = true; // Make available when approved
+    item.isAvailable = true;
+
+    // Set 3-month expiry from approval date for free trial ads
+    if (item.isFreeTrialAd) {
+      item.expiresAt = calculateFreeTrialExpirationDate(new Date());
+    }
 
     await item.save();
 

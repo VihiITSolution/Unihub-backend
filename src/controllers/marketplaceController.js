@@ -48,14 +48,35 @@ const calculateAdFee = (category, itemPrice) => {
  */
 const calculateExpirationDate = () => {
   const durationDays = parseInt(process.env.MARKETPLACE_AD_DURATION_DAYS || 30);
-  
+
   if (durationDays === 0) {
     return null; // No expiration
   }
-  
+
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + durationDays);
   return expiresAt;
+};
+
+/**
+ * Helper: Check if the limited-time free trial promotion is active
+ */
+const isFreeTrialActive = () => {
+  if (process.env.FREE_TRIAL_ENABLED !== 'true') return false;
+
+  const endDate = process.env.FREE_TRIAL_END_DATE;
+  if (endDate && new Date() > new Date(endDate)) return false;
+
+  return true;
+};
+
+/**
+ * Helper: Calculate 3-month expiration date from a given base date
+ */
+const calculateFreeTrialExpirationDate = (baseDate = new Date()) => {
+  const expiry = new Date(baseDate);
+  expiry.setMonth(expiry.getMonth() + 3);
+  return expiry;
 };
 
 /**
@@ -82,14 +103,16 @@ const createListing = async (req, res, next) => {
 
     const { title, description, category, itemType, condition, price, images, location, contactInfo, stock } = req.body;
 
-    // Calculate ad fee and check payment requirement
-    const requiresPayment = checkCategoryRequiresPayment(category);
-    const adFee = calculateAdFee(category, price);
-    
-    // Set initial status based on payment requirement
-    const isPaid = !requiresPayment; // Free categories are auto-paid
-    const approvalStatus = !requiresPayment ? 'approved' : 'pending'; // Free categories auto-approved
-    const expiresAt = !requiresPayment ? null : calculateExpirationDate(); // Free categories don't expire initially
+    // During the free trial promotion every ad is free and goes straight to pending admin review
+    const freeTrial = isFreeTrialActive();
+
+    const requiresPayment = freeTrial ? false : checkCategoryRequiresPayment(category);
+    const adFee = freeTrial ? 0 : calculateAdFee(category, price);
+
+    // Free trial and free-category ads are pre-paid; paid-category ads wait for payment
+    const isPaid = freeTrial || !checkCategoryRequiresPayment(category);
+    // Free trial ads always need admin approval; free-category ads are auto-approved
+    const approvalStatus = (freeTrial || checkCategoryRequiresPayment(category)) ? 'pending' : 'approved';
 
     const item = await MarketplaceItem.create({
       sellerId: req.user.id,
@@ -107,21 +130,28 @@ const createListing = async (req, res, next) => {
       adFee,
       isPaid,
       approvalStatus,
-      expiresAt: isPaid ? null : expiresAt, // Only set expiration after payment
-      paidAt: isPaid ? new Date() : null // Set paidAt for free categories
+      expiresAt: null, // Set on approval for free trial; set after payment for paid ads
+      paidAt: isPaid ? new Date() : null,
+      isFreeTrialAd: freeTrial
     });
 
-    const responseMessage = requiresPayment 
-      ? `Listing created successfully. Please complete payment of $${adFee.toFixed(2)} to publish.`
-      : 'Listing created and published successfully (free category)';
+    let responseMessage;
+    if (freeTrial) {
+      responseMessage = 'Listing submitted for admin review. Once approved it will be live for 3 months — free as part of our limited-time promotion!';
+    } else if (requiresPayment) {
+      responseMessage = `Listing created successfully. Please complete payment of $${adFee.toFixed(2)} to publish.`;
+    } else {
+      responseMessage = 'Listing created and published successfully (free category)';
+    }
 
     res.status(201).json({
       success: true,
       message: responseMessage,
-      data: { 
+      data: {
         item,
         requiresPayment,
-        adFee: requiresPayment ? adFee : 0
+        adFee: requiresPayment ? adFee : 0,
+        isFreeTrialAd: freeTrial
       }
     });
   } catch (error) {
@@ -834,5 +864,7 @@ module.exports = {
   // Export helpers for use in other modules
   calculateAdFee,
   checkCategoryRequiresPayment,
-  calculateExpirationDate
+  calculateExpirationDate,
+  isFreeTrialActive,
+  calculateFreeTrialExpirationDate
 };

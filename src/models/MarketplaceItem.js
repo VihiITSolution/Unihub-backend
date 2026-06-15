@@ -144,6 +144,12 @@ const MarketplaceItem = sequelize.define('MarketplaceItem', {
     defaultValue: true,
     field: 'requires_payment',
     comment: 'Whether this category requires payment'
+  },
+  isFreeTrialAd: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_free_trial_ad',
+    comment: 'Posted during the limited-time free trial promotion'
   }
 }, {
   tableName: 'marketplace_items',
