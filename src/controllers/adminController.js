@@ -7,6 +7,7 @@ const {
   TutorProfile,
   CourseContent,
 } = require("../models");
+const BoardingPlace = require("../models/BoardingPlace");
 const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
 const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
@@ -994,6 +995,142 @@ const rejectTutorProfile = async (req, res, next) => {
   }
 };
 
+/**
+ * Get pending boarding places for approval (Admin only)
+ */
+const getPendingBoardingPlaces = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 100 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: places } = await BoardingPlace.findAndCountAll({
+      where: {
+        [Op.or]: [{ isPaid: true }, { isFreeTrialAd: true }],
+        approvalStatus: "pending",
+      },
+      include: [{ model: User, as: "vendor", attributes: ["id", "firstName", "lastName", "email"] }],
+      limit: parseInt(limit),
+      offset,
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        places,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get all boarding places (Admin only)
+ */
+const getAllBoardingPlaces = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 100 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: places } = await BoardingPlace.findAndCountAll({
+      include: [{ model: User, as: "vendor", attributes: ["id", "firstName", "lastName", "email"] }],
+      limit: parseInt(limit),
+      offset,
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        places,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Approve boarding place (Admin only)
+ */
+const approveBoardingPlace = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const place = await BoardingPlace.findByPk(id);
+
+    if (!place) {
+      return res.status(404).json({ success: false, message: "Boarding place not found" });
+    }
+
+    if (!place.isPaid && !place.isFreeTrialAd) {
+      return res.status(400).json({ success: false, message: "Boarding place must be paid before approval" });
+    }
+
+    if (place.approvalStatus !== "pending") {
+      return res.status(400).json({ success: false, message: `Cannot approve with status: ${place.approvalStatus}` });
+    }
+
+    place.approvalStatus = "approved";
+    place.isApproved = true;
+
+    // Set 3-month expiry from approval date for free trial ads
+    if (place.isFreeTrialAd) {
+      place.expiresAt = calculateFreeTrialExpirationDate(new Date());
+    }
+
+    await place.save();
+
+    res.status(200).json({ success: true, message: "Boarding place approved successfully", data: { place } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reject boarding place (Admin only)
+ */
+const rejectBoardingPlace = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const place = await BoardingPlace.findByPk(id);
+
+    if (!place) {
+      return res.status(404).json({ success: false, message: "Boarding place not found" });
+    }
+
+    if (place.approvalStatus !== "pending" && place.approvalStatus !== "approved") {
+      return res.status(400).json({ success: false, message: `Cannot reject with status: ${place.approvalStatus}` });
+    }
+
+    place.approvalStatus = "rejected";
+    place.isApproved = false;
+    place.isActive = false;
+    place.rejectionReason = reason || "No reason provided";
+
+    await place.save();
+
+    res.status(200).json({ success: true, message: "Boarding place rejected", data: { place } });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUserStatus,
@@ -1013,4 +1150,8 @@ module.exports = {
   getTutorProfileDetails,
   approveTutorProfile,
   rejectTutorProfile,
+  getPendingBoardingPlaces,
+  getAllBoardingPlaces,
+  approveBoardingPlace,
+  rejectBoardingPlace,
 };

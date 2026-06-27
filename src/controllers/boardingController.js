@@ -2,6 +2,7 @@ const BoardingPlace = require('../models/BoardingPlace');
 const User = require('../models/User');
 const VendorProfile = require('../models/VendorProfile');
 const { Op } = require('sequelize');
+const { isFreeTrialActive, calculateFreeTrialExpirationDate } = require('./marketplaceController');
 
 // @desc    Create new boarding place listing
 // @route   POST /api/boarding/places
@@ -29,7 +30,9 @@ exports.createBoardingPlace = async (req, res) => {
     // Calculate available slots (initially same as capacity)
     const availableSlots = capacity;
 
-    // Create boarding place (unpaid initially)
+    const freeTrial = isFreeTrialActive();
+
+    // Create boarding place
     const boardingPlace = await BoardingPlace.create({
       vendorId: userId,
       title,
@@ -50,17 +53,23 @@ exports.createBoardingPlace = async (req, res) => {
       images: images || [],
       contactPhone,
       contactEmail,
-      isActive: false, // Inactive until paid
-      isPaid: false,
-      adFee: process.env.BOARDING_AD_FEE || 50.00 // Default $50 for listing
+      isActive: freeTrial,
+      isPaid: freeTrial,
+      adFee: freeTrial ? 0 : (process.env.BOARDING_AD_FEE || 50.00),
+      isFreeTrialAd: freeTrial,
+      approvalStatus: 'pending',
+      expiresAt: null // set on admin approval
     });
 
     res.status(201).json({
       success: true,
-      message: 'Boarding place created. Please complete payment to activate.',
+      message: freeTrial
+        ? 'Boarding place submitted! It will be reviewed and listed free for 3 months.'
+        : 'Boarding place created. Please complete payment to activate.',
       boardingPlace,
-      paymentRequired: true,
-      adFee: boardingPlace.adFee
+      paymentRequired: !freeTrial,
+      adFee: freeTrial ? 0 : boardingPlace.adFee,
+      isFreeTrialAd: freeTrial
     });
   } catch (error) {
     console.error('Create boarding place error:', error);
@@ -153,9 +162,9 @@ exports.getBoardingPlaces = async (req, res) => {
     const offset = (page - 1) * limit;
     const where = {
       isActive: true,
-      isPaid: true,
+      [Op.or]: [{ isPaid: true }, { isFreeTrialAd: true }],
       approvalStatus: 'approved',
-      expiresAt: { [Op.gt]: new Date() } // Not expired
+      expiresAt: { [Op.gt]: new Date() }
     };
 
     // Apply filters

@@ -176,6 +176,12 @@ const BoardingPlace = sequelize.define('BoardingPlace', {
     type: DataTypes.TEXT,
     allowNull: true,
     field: 'rejection_reason'
+  },
+  isFreeTrialAd: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_free_trial_ad',
+    comment: 'Posted during the limited-time free trial promotion'
   }
 }, {
   tableName: 'boarding_places',

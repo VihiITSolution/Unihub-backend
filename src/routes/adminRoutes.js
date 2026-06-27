@@ -15,9 +15,13 @@ const {
   rejectMarketplaceItem,
   getPendingBankTransfers,
   getAllTutorProfiles,
-  getTutorProfileDetails, 
+  getTutorProfileDetails,
   approveTutorProfile,
   rejectTutorProfile,
+  getPendingBoardingPlaces,
+  getAllBoardingPlaces,
+  approveBoardingPlace,
+  rejectBoardingPlace,
 } = require("../controllers/adminController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 
@@ -597,6 +601,35 @@ router.put(
   authMiddleware,
   authorize("admin"),
   rejectTutorProfile,
+);
+
+// Boarding Place management routes
+router.get(
+  "/boarding/places",
+  authMiddleware,
+  authorize("admin"),
+  getAllBoardingPlaces,
+);
+
+router.get(
+  "/boarding/places/pending",
+  authMiddleware,
+  authorize("admin"),
+  getPendingBoardingPlaces,
+);
+
+router.put(
+  "/boarding/places/:id/approve",
+  authMiddleware,
+  authorize("admin"),
+  approveBoardingPlace,
+);
+
+router.put(
+  "/boarding/places/:id/reject",
+  authMiddleware,
+  authorize("admin"),
+  rejectBoardingPlace,
 );
 
 module.exports = router;
