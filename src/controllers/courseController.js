@@ -12,6 +12,9 @@ const createCourse = async (req, res, next) => {
       shortDescription,
       aboutCourse,
       category,
+      facultyId,
+      departmentId,
+      year,
       level,
       price,
       duration,
@@ -39,6 +42,9 @@ const createCourse = async (req, res, next) => {
       shortDescription: shortDescription || null,
       aboutCourse: aboutCourse || null,
       category: finalCategory || null,
+      facultyId: facultyId ? parseInt(facultyId) : null,
+      departmentId: departmentId ? parseInt(departmentId) : null,
+      year: year ? parseInt(year) : null,
       level,
       price,
       duration,
@@ -170,6 +176,13 @@ const getCourseById = async (req, res, next) => {
           model: require("../models/Faculty"),
           as: "faculty",
           attributes: ["id", "name", "icon", "description"],
+          required: false,
+        },
+        {
+          model: Department,
+          as: "department",
+          attributes: ["id", "name", "slug"],
+          required: false,
         },
         {
           model: require("../models").Category,
@@ -255,6 +268,7 @@ const updateCourse = async (req, res, next) => {
       category,
       level,
       facultyId,
+      departmentId,
       year,
       price,
       duration,
@@ -269,8 +283,10 @@ const updateCourse = async (req, res, next) => {
     if (category) course.category = category;
     if (level) course.level = level;
     if (facultyId !== undefined) {
-      course.facultyId =
-        facultyId && facultyId !== "" ? parseInt(facultyId) : null;
+      course.facultyId = facultyId && facultyId !== "" ? parseInt(facultyId) : null;
+    }
+    if (departmentId !== undefined) {
+      course.departmentId = departmentId && departmentId !== "" ? parseInt(departmentId) : null;
     }
     if (year !== undefined) {
       course.year = year && year !== "" ? parseInt(year) : null;

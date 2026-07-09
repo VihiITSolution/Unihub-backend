@@ -6,7 +6,9 @@ const {
   MarketplaceItem,
   TutorProfile,
   CourseContent,
+  Department,
 } = require("../models");
+const Faculty = require("../models/Faculty");
 const BoardingPlace = require("../models/BoardingPlace");
 const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
@@ -212,6 +214,18 @@ const getAllCourses = async (req, res, next) => {
           model: User,
           as: "tutor",
           attributes: ["id", "firstName", "lastName", "email"],
+        },
+        {
+          model: Faculty,
+          as: "faculty",
+          attributes: ["id", "name", "icon"],
+          required: false,
+        },
+        {
+          model: Department,
+          as: "department",
+          attributes: ["id", "name"],
+          required: false,
         },
       ],
       limit: parseInt(limit),
