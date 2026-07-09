@@ -26,9 +26,14 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
  */
 exports.getAllUniversities = async (req, res) => {
   try {
-    const { city, type, search, isActive = true } = req.query;
+    const { city, type, search, isActive } = req.query;
 
-    const where = { isActive };
+    const where = {};
+
+    // Only filter by isActive when explicitly requested; omitting it returns all records
+    if (isActive !== undefined) {
+      where.isActive = isActive === 'true' || isActive === true;
+    }
 
     if (city) {
       where.city = { [Op.like]: `%${city}%` };
@@ -48,8 +53,9 @@ exports.getAllUniversities = async (req, res) => {
     const universities = await University.findAll({
       where,
       order: [['name', 'ASC']],
-      attributes: ['id', 'name', 'shortName', 'city', 'district', 'province', 
-                   'latitude', 'longitude', 'type', 'website']
+      attributes: ['id', 'name', 'shortName', 'city', 'district', 'province',
+                   'address', 'latitude', 'longitude', 'type', 'website',
+                   'phone', 'email', 'isActive', 'createdAt', 'updatedAt']
     });
 
     res.json({
@@ -207,8 +213,8 @@ exports.createUniversity = async (req, res) => {
       longitude,
       type,
       website,
-      contactEmail,
-      contactPhone,
+      email,
+      phone,
       isActive = true
     } = req.body;
 
@@ -251,8 +257,8 @@ exports.createUniversity = async (req, res) => {
       longitude,
       type: type || 'public',
       website,
-      contactEmail,
-      contactPhone,
+      email,
+      phone,
       isActive
     });
 
