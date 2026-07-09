@@ -22,6 +22,7 @@ const vendorRoutes = require("./routes/vendorRoutes");
 const boardingRoutes = require("./routes/boardingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const facultyRoutes = require("./routes/facultyRoutes");
+const departmentRoutes = require("./routes/departmentRoutes");
 const universityRoutes = require("./routes/universityRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 
@@ -129,6 +130,7 @@ app.use("/api/profile/vendor", vendorRoutes);
 app.use("/api/boarding", boardingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/faculties", facultyRoutes);
+app.use("/api/departments", departmentRoutes);
 app.use("/api/universities", universityRoutes);
 app.use("/api/notifications", notificationRoutes);
 

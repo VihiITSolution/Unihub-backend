@@ -28,6 +28,10 @@ const Faculty = sequelize.define(
       defaultValue: true,
       field: "is_active",
     },
+    order: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
     createdBy: {
       type: DataTypes.INTEGER,
       field: "created_by",

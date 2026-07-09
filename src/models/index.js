@@ -14,6 +14,7 @@ const SessionEnrollment = require("./SessionEnrollment");
 const BoardingPlace = require("./BoardingPlace");
 const Review = require("./Review");
 const Faculty = require("./Faculty");
+const Department = require("./Department");
 const University = require("./University");
 const Notification = require("./Notification");
 const Category = require("./Category");
@@ -43,9 +44,17 @@ VendorProfile.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 User.hasMany(Course, { foreignKey: "tutorId", as: "courses" });
 Course.belongsTo(User, { foreignKey: "tutorId", as: "tutor" });
 
+// Faculty - Department relationship
+Faculty.hasMany(Department, { foreignKey: "facultyId", as: "departments" });
+Department.belongsTo(Faculty, { foreignKey: "facultyId", as: "faculty" });
+
 // Faculty - Course relationship
 Faculty.hasMany(Course, { foreignKey: "facultyId", as: "courses" });
 Course.belongsTo(Faculty, { foreignKey: "facultyId", as: "faculty" });
+
+// Department - Course relationship
+Department.hasMany(Course, { foreignKey: "departmentId", as: "courses" });
+Course.belongsTo(Department, { foreignKey: "departmentId", as: "department" });
 
 // Faculty - User relationship (Created by)
 User.hasMany(Faculty, { foreignKey: "createdBy", as: "createdFaculties" });
@@ -192,6 +201,7 @@ module.exports = {
   BoardingPlace,
   Review,
   Faculty,
+  Department,
   University,
   Notification,
   Category,

@@ -1,4 +1,4 @@
-const { Course, User, Enrollment, Category } = require("../models");
+const { Course, User, Enrollment, Category, Department } = require("../models");
 const { Op } = require("sequelize");
 
 /**
@@ -66,6 +66,7 @@ const getCourses = async (req, res, next) => {
       category,
       level,
       facultyId,
+      departmentId,
       year,
       minPrice,
       maxPrice,
@@ -80,6 +81,7 @@ const getCourses = async (req, res, next) => {
     if (category) where.category = category;
     if (level) where.level = level;
     if (facultyId) where.facultyId = facultyId;
+    if (departmentId) where.departmentId = departmentId;
     if (year) where.year = year;
 
     if (minPrice || maxPrice) {
@@ -108,6 +110,13 @@ const getCourses = async (req, res, next) => {
           model: require("../models/Faculty"),
           as: "faculty",
           attributes: ["id", "name", "icon", "description"],
+          required: false,
+        },
+        {
+          model: Department,
+          as: "department",
+          attributes: ["id", "name", "slug"],
+          required: false,
         },
         {
           model: require("../models").Category,
