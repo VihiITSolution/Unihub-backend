@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const helmet = require("helmet");
 const swaggerUi = require("swagger-ui-express");
@@ -82,6 +83,11 @@ app.use(
 // Body parser middleware
 app.use(express.json({ limit: "5gb" }));
 app.use(express.urlencoded({ extended: true, limit: "5gb" }));
+
+// Serves everything under uploads/ (thumbnails, videos, and - written by the
+// Unihub-social microservice via a shared volume in production - avatars
+// and post images).
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Apply rate limiting to all API routes
 app.use("/api", apiLimiter);
