@@ -1,6 +1,26 @@
 const jwt = require("jsonwebtoken");
 const { User } = require("../models");
 
+/**
+ * Verifies a JWT and loads the corresponding active user. Shared by
+ * authMiddleware (HTTP) and the Socket.io auth middleware, so both
+ * transports enforce identical rules.
+ * @returns {Promise<import("../models/User")>} the loaded user
+ * @throws if the token is invalid/expired or the user is missing/inactive
+ */
+const verifyJwtAndLoadUser = async (token) => {
+  const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+    algorithms: ["HS256"],
+  });
+  const user = await User.findByPk(decoded.id);
+
+  if (!user || !user.isActive) {
+    throw new Error("Invalid token or user inactive.");
+  }
+
+  return user;
+};
+
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -12,19 +32,7 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-      algorithms: ["HS256"],
-    });
-    const user = await User.findByPk(decoded.id);
-
-    if (!user || !user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token or user inactive.",
-      });
-    }
-
-    req.user = user;
+    req.user = await verifyJwtAndLoadUser(token);
     next();
   } catch (error) {
     return res.status(401).json({
@@ -95,4 +103,10 @@ const hasRole = (user, role) => {
   return user && user.roles && user.roles.includes(role);
 };
 
-module.exports = { authMiddleware, optionalAuthMiddleware, authorize, hasRole };
+module.exports = {
+  authMiddleware,
+  optionalAuthMiddleware,
+  authorize,
+  hasRole,
+  verifyJwtAndLoadUser,
+};

@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "setup-db": "node src/migrations/setup-db.js",
     "migrate": "node src/migrations/migrate.js",
+    "migrate:chat": "node src/migrations/create-chat-tables.js",
     "seed": "node src/migrations/seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -38,6 +39,7 @@
     "node-fetch": "^3.3.2",
     "open": "^11.0.0",
     "sequelize": "^6.37.7",
+    "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0"
