@@ -5,6 +5,7 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
 const errorHandler = require("./middleware/errorHandler");
 const { apiLimiter } = require("./middleware/rateLimiter");
+const { corsOriginCallback } = require("./config/cors");
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
@@ -25,6 +26,8 @@ const facultyRoutes = require("./routes/facultyRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
 const universityRoutes = require("./routes/universityRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const adminChatRoutes = require("./routes/adminChatRoutes");
 
 const app = express();
 
@@ -36,43 +39,10 @@ if (process.env.NODE_ENV === "production") {
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-const allowedOrigins = process.env.ALLOWED_FRONTEND_ORIGINS
-  ? process.env.ALLOWED_FRONTEND_ORIGINS.split(",").map((origin) =>
-      origin.trim(),
-    )
-  : [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "http://localhost:3002",
-      "http://unihub-frontend:3000",
-    ];
-
+// CORS configuration (shared with Socket.io - see config/cors.js)
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, server-to-server)
-      if (!origin) return callback(null, true);
-
-      // Allow if in the allowed list
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        return callback(null, true);
-      }
-
-      // Allow any origin that is the same host (different port) as the server
-      // This handles cases where admin/frontend is on same IP but different port
-      if (process.env.NODE_ENV === "production") {
-        // In production, allow all origins from the same server IP
-        const serverHost = process.env.DO_HOST || "";
-        if (serverHost && origin.includes(serverHost)) {
-          return callback(null, true);
-        }
-        // Allow any http/https origin in production (API is protected by JWT anyway)
-        return callback(null, true);
-      }
-
-      callback(new Error("Not allowed by CORS"));
-    },
+    origin: corsOriginCallback,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -133,6 +103,8 @@ app.use("/api/faculties", facultyRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/universities", universityRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/admin/chat", adminChatRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

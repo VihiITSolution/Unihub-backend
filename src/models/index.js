@@ -18,6 +18,10 @@ const Department = require("./Department");
 const University = require("./University");
 const Notification = require("./Notification");
 const Category = require("./Category");
+const Conversation = require("./Conversation");
+const Message = require("./Message");
+const MessageAttachment = require("./MessageAttachment");
+const BlockedMessageLog = require("./BlockedMessageLog");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -184,6 +188,68 @@ Category.belongsTo(User, { foreignKey: "createdByTutorId", as: "creator" });
 Course.belongsTo(Category, { foreignKey: "category", as: "categoryObj" });
 Category.hasMany(Course, { foreignKey: "category", as: "courses" });
 
+// Conversation relationships (chat feature)
+User.hasMany(Conversation, {
+  foreignKey: "participantOneId",
+  as: "conversationsAsOne",
+});
+Conversation.belongsTo(User, {
+  foreignKey: "participantOneId",
+  as: "participantOne",
+});
+
+User.hasMany(Conversation, {
+  foreignKey: "participantTwoId",
+  as: "conversationsAsTwo",
+});
+Conversation.belongsTo(User, {
+  foreignKey: "participantTwoId",
+  as: "participantTwo",
+});
+
+Conversation.belongsTo(User, { foreignKey: "flaggedBy", as: "flagger" });
+
+Conversation.hasMany(Message, {
+  foreignKey: "conversationId",
+  as: "messages",
+});
+Message.belongsTo(Conversation, {
+  foreignKey: "conversationId",
+  as: "conversation",
+});
+
+User.hasMany(Message, { foreignKey: "senderId", as: "sentMessages" });
+Message.belongsTo(User, { foreignKey: "senderId", as: "sender" });
+
+Message.hasMany(MessageAttachment, {
+  foreignKey: "messageId",
+  as: "attachments",
+});
+MessageAttachment.belongsTo(Message, {
+  foreignKey: "messageId",
+  as: "message",
+});
+
+Conversation.hasMany(BlockedMessageLog, {
+  foreignKey: "conversationId",
+  as: "blockedAttempts",
+});
+BlockedMessageLog.belongsTo(Conversation, {
+  foreignKey: "conversationId",
+  as: "conversation",
+});
+
+User.hasMany(BlockedMessageLog, {
+  foreignKey: "senderId",
+  as: "blockedMessageAttempts",
+});
+BlockedMessageLog.belongsTo(User, { foreignKey: "senderId", as: "sender" });
+
+BlockedMessageLog.belongsTo(User, {
+  foreignKey: "reviewedByAdminId",
+  as: "reviewer",
+});
+
 module.exports = {
   sequelize,
   User,
@@ -205,4 +271,8 @@ module.exports = {
   University,
   Notification,
   Category,
+  Conversation,
+  Message,
+  MessageAttachment,
+  BlockedMessageLog,
 };
