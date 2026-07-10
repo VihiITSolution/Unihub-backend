@@ -18,7 +18,7 @@ const runCriticalMigrations = async (sequelizeInstance) => {
       CREATE TABLE IF NOT EXISTS notifications (
         id INT PRIMARY KEY AUTO_INCREMENT,
         user_id INT NOT NULL,
-        type ENUM('tutor_approved','tutor_rejected','course_approved','course_rejected','enrollment','payment','general') NOT NULL,
+        type ENUM('tutor_approved','tutor_rejected','course_approved','course_rejected','enrollment','payment','general','follow','post_like','post_comment') NOT NULL,
         title VARCHAR(255) NOT NULL,
         message TEXT NOT NULL,
         is_read TINYINT(1) DEFAULT 0,
@@ -44,6 +44,18 @@ const runCriticalMigrations = async (sequelizeInstance) => {
       `);
     } catch (alterError) {
       // Ignore - columns might already be correct
+    }
+
+    // Step 2b: Widen the type ENUM for tables created before the social
+    // notification types (follow/post_like/post_comment, written by the
+    // Unihub-social microservice) existed.
+    try {
+      await sequelizeInstance.query(`
+        ALTER TABLE notifications
+        MODIFY COLUMN type ENUM('tutor_approved','tutor_rejected','course_approved','course_rejected','enrollment','payment','general','follow','post_like','post_comment') NOT NULL
+      `);
+    } catch (alterError) {
+      // Ignore - enum might already be widened
     }
 
     console.log("✓ Notifications table ready.");
