@@ -48,6 +48,10 @@ jobs:
             # Login to Docker Hub
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
+            # Shared with unihub-social so avatar/post-image uploads written
+            # by that service are servable from this one's /uploads route.
+            docker volume create unihub-uploads || true
+
             # Stop and remove old container
             docker stop unihub-backend || true
             docker rm unihub-backend || true
@@ -61,6 +65,7 @@ jobs:
               --network unihub-network \
               --restart unless-stopped \
               -p 5000:3000 \
+              -v unihub-uploads:/app/uploads \
               -e NODE_ENV=production \
               -e HOST=0.0.0.0 \
               -e DB_HOST=${{ secrets.DB_HOST }} \
