@@ -22,6 +22,7 @@ const Conversation = require("./Conversation");
 const Message = require("./Message");
 const MessageAttachment = require("./MessageAttachment");
 const BlockedMessageLog = require("./BlockedMessageLog");
+const SupportTicket = require("./SupportTicket");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -174,6 +175,10 @@ Review.belongsTo(User, { foreignKey: "userId", as: "user" });
 Course.hasMany(Review, { foreignKey: "courseId", as: "reviews" });
 Review.belongsTo(Course, { foreignKey: "courseId", as: "course" });
 
+// SupportTicket relationships
+User.hasMany(SupportTicket, { foreignKey: "userId", as: "supportTickets" });
+SupportTicket.belongsTo(User, { foreignKey: "userId", as: "user" });
+
 // Notification relationships
 User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
 Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
@@ -275,4 +280,5 @@ module.exports = {
   Message,
   MessageAttachment,
   BlockedMessageLog,
+  SupportTicket,
 };

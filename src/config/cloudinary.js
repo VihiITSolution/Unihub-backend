@@ -83,10 +83,37 @@ const uploadPDF = multer({
   },
 }).single("video");
 
+// Storage for support ticket attachments (images or PDFs)
+const ticketAttachmentStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/support-tickets",
+    resource_type: "auto",
+    allowed_formats: ["jpg", "jpeg", "png", "pdf"],
+  },
+});
+
+// Ticket attachment upload middleware - up to 5 files, 10MB each
+const uploadTicketAttachments = multer({
+  storage: ticketAttachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 5,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "application/pdf"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only PNG, JPG, and PDF files are allowed"));
+    }
+    cb(null, true);
+  },
+}).array("attachments", 5);
+
 module.exports = {
   cloudinary,
   uploadThumbnail,
   uploadVideo,
   uploadProfileImage,
   uploadPDF,
+  uploadTicketAttachments,
 };
