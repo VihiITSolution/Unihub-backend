@@ -77,6 +77,7 @@ const getCourses = async (req, res, next) => {
       minPrice,
       maxPrice,
       search,
+      sortBy,
       page = 1,
       limit = 10,
     } = req.query;
@@ -103,6 +104,14 @@ const getCourses = async (req, res, next) => {
     }
 
     const offset = (page - 1) * limit;
+
+    const SORT_OPTIONS = {
+      popular: [["enrollmentCount", "DESC"]],
+      latest: [["createdAt", "DESC"]],
+      price_low: [["price", "ASC"]],
+      price_high: [["price", "DESC"]],
+    };
+    const order = SORT_OPTIONS[sortBy] || [["createdAt", "DESC"]];
 
     const { count, rows: courses } = await Course.findAndCountAll({
       where,
@@ -133,7 +142,7 @@ const getCourses = async (req, res, next) => {
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [["createdAt", "DESC"]],
+      order,
     });
 
     res.status(200).json({

@@ -14,7 +14,7 @@ const extractYouTubeVideoId = (url = "") => {
     return url.split("youtu.be/")[1]?.split("?")[0] || null;
   }
 
-  if (url.includes("youtube.com/embed/")) {
+  if (url.includes("youtube.com/embed/") || url.includes("youtube-nocookie.com/embed/")) {
     return url.split("/embed/")[1]?.split("?")[0] || null;
   }
 
