@@ -1,4 +1,4 @@
-const { CourseContent, Enrollment } = require("../models");
+const { CourseContent, Enrollment, Course } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const path = require("path");
 const fs = require("fs");
@@ -139,7 +139,10 @@ const addCourseContent = async (req, res, next) => {
 };
 
 /**
- * Get all content for a course
+ * Get all content for a course.
+ * Publicly accessible for browsing (title/type/order/isPreview), but the
+ * actual playable url is only included for preview lessons unless the
+ * requester is enrolled in the course, owns it (tutor), or is an admin.
  */
 const getCourseContent = async (req, res, next) => {
   try {
@@ -153,10 +156,42 @@ const getCourseContent = async (req, res, next) => {
       ],
     });
 
+    let hasFullAccess = false;
+    if (req.user) {
+      const userRoles = req.user.roles || [];
+      if (userRoles.includes("admin")) {
+        hasFullAccess = true;
+      } else {
+        const course = await Course.findByPk(courseId);
+        if (course && course.tutorId === req.user.id) {
+          hasFullAccess = true;
+        } else {
+          const enrollment = await Enrollment.findOne({
+            where: { learnerId: req.user.id, courseId },
+          });
+          hasFullAccess = enrollment !== null;
+        }
+      }
+    }
+
     // Filter out any invalid content without type
     const validContents = contents
       .filter((content) => content.type)
-      .map((content) => sanitizeContentForClient(content));
+      .map((content) => {
+        const sanitized = sanitizeContentForClient(content);
+        if (hasFullAccess || sanitized.isPreview) {
+          return sanitized;
+        }
+        // Lock non-preview content for guests/non-enrolled users:
+        // strip the playable url so it can't be retrieved via the API
+        // before enrolling.
+        return {
+          ...sanitized,
+          url: null,
+          youtubeVideoId: null,
+          locked: true,
+        };
+      });
 
     res.status(200).json({
       success: true,
@@ -261,9 +296,10 @@ const getContentById = async (req, res, next) => {
 
     const isEnrolled = enrollment !== null;
     const isAdmin = userRoles.includes("admin");
-    const isTutor = userRoles.includes("tutor");
+    const course = await Course.findByPk(content.courseId);
+    const isOwningTutor = course !== null && course.tutorId === userId;
 
-    if (!isEnrolled && !isAdmin && !isTutor) {
+    if (!isEnrolled && !isAdmin && !isOwningTutor) {
       return res.status(403).json({
         success: false,
         message: "You must be enrolled in this course to access this content",

@@ -7,6 +7,7 @@ const swaggerSpec = require("./config/swagger");
 const errorHandler = require("./middleware/errorHandler");
 const { apiLimiter } = require("./middleware/rateLimiter");
 const { corsOriginCallback } = require("./config/cors");
+const { blockMaliciousInput } = require("./middleware/inputSecurity");
 
 // Import routes
 const authRoutes = require("./routes/authRoutes");
@@ -53,6 +54,10 @@ app.use(
 // Body parser middleware
 app.use(express.json({ limit: "5gb" }));
 app.use(express.urlencoded({ extended: true, limit: "5gb" }));
+
+// Reject XSS/SQL-injection-style payloads in body/query/params before they
+// reach any route handler
+app.use(blockMaliciousInput);
 
 // Serves everything under uploads/ (thumbnails, videos, and - written by the
 // Unihub-social microservice via a shared volume in production - avatars

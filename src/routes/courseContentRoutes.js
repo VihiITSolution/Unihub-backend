@@ -7,7 +7,11 @@ const {
   deleteCourseContent,
   getContentById,
 } = require("../controllers/courseContentController");
-const { authMiddleware, authorize } = require("../middleware/auth");
+const {
+  authMiddleware,
+  authorize,
+  optionalAuthMiddleware,
+} = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { uploadVideo } = require("../config/upload");
 const { uploadPDF } = require("../config/cloudinary");
@@ -39,8 +43,13 @@ router.post(
   addCourseContent,
 );
 
-// Get all content for a course
-router.get("/courses/:courseId/content", getCourseContent);
+// Get all content for a course (guest-accessible; non-preview lesson urls
+// are only included for enrolled/owning/admin users, see controller)
+router.get(
+  "/courses/:courseId/content",
+  optionalAuthMiddleware,
+  getCourseContent,
+);
 
 // Get specific content by ID (requires enrollment)
 router.get("/content/:contentId", authMiddleware, getContentById);
