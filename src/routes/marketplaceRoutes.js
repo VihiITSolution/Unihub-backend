@@ -1,8 +1,9 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { 
-  createListing, 
-  getListings, 
+const {
+  uploadListingImages,
+  createListing,
+  getListings,
   getListingById, 
   updateListing, 
   deleteListing, 
@@ -18,8 +19,23 @@ const {
 const { authMiddleware } = require('../middleware/auth');
 const { createLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
+const { uploadMarketplaceImages } = require('../config/cloudinary');
 
 const router = express.Router();
+
+router.post(
+  '/upload-images',
+  authMiddleware,
+  (req, res, next) => {
+    uploadMarketplaceImages(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      next();
+    });
+  },
+  uploadListingImages,
+);
 
 /**
  * @swagger

@@ -3,8 +3,11 @@ const { body } = require("express-validator");
 const {
   register,
   login,
+  forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
+  changePassword,
   uploadProfilePhoto,
   switchRole,
 } = require("../controllers/authController");
@@ -129,6 +132,27 @@ router.post(
   login,
 );
 
+router.post(
+  "/forgot-password",
+  authLimiter,
+  [body("email").isEmail().withMessage("Valid email is required"), validate],
+  forgotPassword,
+);
+
+router.post(
+  "/reset-password",
+  authLimiter,
+  [
+    body("email").isEmail().withMessage("Valid email is required"),
+    body("token").notEmpty().withMessage("Reset token is required"),
+    body("newPassword")
+      .isLength({ min: 8 })
+      .withMessage("Password must be at least 8 characters"),
+    validate,
+  ],
+  resetPassword,
+);
+
 /**
  * @swagger
  * /api/auth/profile:
@@ -200,6 +224,19 @@ router.put(
     validate,
   ],
   updateProfile,
+);
+
+router.put(
+  "/change-password",
+  authMiddleware,
+  [
+    body("currentPassword").notEmpty().withMessage("Current password is required"),
+    body("newPassword")
+      .isLength({ min: 8 })
+      .withMessage("New password must be at least 8 characters"),
+    validate,
+  ],
+  changePassword,
 );
 
 /**

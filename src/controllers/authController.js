@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+const { Op } = require("sequelize");
 const { User, StudentProfile, TutorProfile } = require("../models");
 const { generateToken } = require("../utils/token");
 
@@ -34,7 +36,10 @@ const register = async (req, res, next) => {
       firstName,
       lastName,
       email,
-      password,
+      // Trim accidental leading/trailing whitespace (autofill/copy-paste)
+      // so it never becomes part of the hashed password - kept consistent
+      // with the same trim applied on login.
+      password: password.trim(),
       roles: userRoles,
       primaryRole: userPrimaryRole,
       phoneNumber,
@@ -102,7 +107,10 @@ const login = async (req, res, next) => {
       });
     }
 
-    const isPasswordValid = await user.validatePassword(password);
+    // Trim accidental leading/trailing whitespace - same trim applied at
+    // registration, so a password typed with stray spaces (autofill/copy-paste)
+    // doesn't fail to match.
+    const isPasswordValid = await user.validatePassword(password.trim());
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -140,6 +148,90 @@ const login = async (req, res, next) => {
         user: userData,
         token,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Request a password reset. Always returns the same generic message whether
+ * or not the email is registered, so this endpoint can't be used to probe
+ * which emails have accounts.
+ *
+ * No email-delivery service (SMTP/nodemailer etc.) is wired up in this
+ * codebase yet, so outside production the raw reset token/URL is returned
+ * directly in the response - that's the only way to exercise the reset flow
+ * end to end until real email delivery is added. In production this would
+ * currently be a dead end for the user; wiring up an email service is a
+ * separate follow-up.
+ */
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const genericMessage =
+      "If an account with that email exists, a password reset link has been generated.";
+
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(200).json({ success: true, message: genericMessage });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const response = { success: true, message: genericMessage };
+
+    if (process.env.NODE_ENV !== "production") {
+      response.data = {
+        resetToken: rawToken,
+        resetUrl: `/auth/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`,
+      };
+    }
+
+    res.status(200).json(response);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Complete a password reset using the token issued by forgotPassword.
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { email, token, newPassword } = req.body;
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      where: {
+        email,
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: { [Op.gt]: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This reset link is invalid or has expired. Please request a new one.",
+      });
+    }
+
+    user.password = newPassword.trim();
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully. You can now log in with your new password.",
     });
   } catch (error) {
     next(error);
@@ -191,6 +283,36 @@ const updateProfile = async (req, res, next) => {
       success: true,
       message: "Profile updated successfully",
       data: { user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Change password for the logged-in user (requires the current password).
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findByPk(req.user.id);
+
+    const isCurrentPasswordValid = await user.validatePassword(
+      currentPassword.trim(),
+    );
+    if (!isCurrentPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    user.password = newPassword.trim();
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
     });
   } catch (error) {
     next(error);
@@ -281,8 +403,11 @@ const switchRole = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
+  changePassword,
   uploadProfilePhoto,
   switchRole,
 };

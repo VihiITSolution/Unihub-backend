@@ -109,6 +109,32 @@ const uploadTicketAttachments = multer({
   },
 }).array("attachments", 5);
 
+// Storage for marketplace listing images
+const marketplaceImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/marketplace",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    transformation: [{ width: 1280, height: 1280, crop: "limit" }],
+  },
+});
+
+// Marketplace image upload middleware - up to 5 images, 5MB each
+const uploadMarketplaceImages = multer({
+  storage: marketplaceImageStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 5,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only PNG and JPG images are allowed"));
+    }
+    cb(null, true);
+  },
+}).array("images", 5);
+
 module.exports = {
   cloudinary,
   uploadThumbnail,
@@ -116,4 +142,5 @@ module.exports = {
   uploadProfileImage,
   uploadPDF,
   uploadTicketAttachments,
+  uploadMarketplaceImages,
 };

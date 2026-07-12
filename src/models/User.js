@@ -87,6 +87,17 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       field: "last_login",
     },
+    resetPasswordToken: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "reset_password_token",
+      comment: "Hashed password-reset token, cleared once used or expired",
+    },
+    resetPasswordExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "reset_password_expires",
+    },
   },
   {
     tableName: "users",

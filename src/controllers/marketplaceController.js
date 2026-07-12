@@ -80,6 +80,33 @@ const calculateFreeTrialExpirationDate = (baseDate = new Date()) => {
 };
 
 /**
+ * Upload marketplace listing images to Cloudinary and return their URLs.
+ * Called before createListing/updateListing so the resulting URLs can be
+ * included in that (JSON, not multipart) request body.
+ */
+const uploadListingImages = async (req, res, next) => {
+  try {
+    const files = req.files || [];
+    if (files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No images uploaded',
+      });
+    }
+
+    const images = files.map((file) => file.path);
+
+    res.status(200).json({
+      success: true,
+      message: 'Images uploaded successfully',
+      data: { images },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Create marketplace listing (Vendor only)
  */
 const createListing = async (req, res, next) => {
@@ -848,6 +875,7 @@ const initiatePayment = async (req, res, next) => {
 };
 
 module.exports = {
+  uploadListingImages,
   createListing,
   getListings,
   getListingById,
