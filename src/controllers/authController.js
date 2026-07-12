@@ -175,10 +175,14 @@ const updateProfile = async (req, res, next) => {
     const { firstName, lastName, phoneNumber, bio, profileImage } = req.body;
     const user = await User.findByPk(req.user.id);
 
-    if (firstName) user.firstName = firstName;
-    if (lastName) user.lastName = lastName;
-    if (phoneNumber) user.phoneNumber = phoneNumber;
-    if (bio) user.bio = bio;
+    // firstName/lastName are validated as required above, so always set them.
+    // phoneNumber/bio are optional and clearable, so "" must overwrite the
+    // previous value instead of being ignored (previously used a truthy
+    // check, so clearing the field back to empty silently no-opted).
+    user.firstName = firstName;
+    user.lastName = lastName;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+    if (bio !== undefined) user.bio = bio;
     if (profileImage) user.profileImage = profileImage;
 
     await user.save();

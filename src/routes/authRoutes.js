@@ -12,6 +12,7 @@ const { authMiddleware } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
 const { uploadProfileImage } = require("../config/cloudinary");
+const { isValidPhone, hasLetters, isNameLike } = require("../utils/fieldValidators");
 
 const router = express.Router();
 
@@ -66,6 +67,26 @@ router.post(
       .optional()
       .isIn(["student", "tutor"])
       .withMessage("Invalid role"),
+    body("phoneNumber")
+      .optional({ checkFalsy: true })
+      .custom(isValidPhone)
+      .withMessage("Enter a valid phone number"),
+    body("studentProfile.department")
+      .optional({ checkFalsy: true })
+      .custom(hasLetters)
+      .withMessage("Department must contain letters, not just numbers"),
+    body("studentProfile.degreeOrCourse")
+      .optional({ checkFalsy: true })
+      .custom(hasLetters)
+      .withMessage("Degree/Course must contain letters, not just numbers"),
+    body("studentProfile.studyingArea")
+      .optional({ checkFalsy: true })
+      .custom(hasLetters)
+      .withMessage("Studying Area must contain letters, not just numbers"),
+    body("studentProfile.phoneNumber")
+      .optional({ checkFalsy: true })
+      .custom(isValidPhone)
+      .withMessage("Enter a valid phone number"),
     validate,
   ],
   register,
@@ -150,7 +171,36 @@ router.get("/profile", authMiddleware, getProfile);
  *       200:
  *         description: Profile updated successfully
  */
-router.put("/profile", authMiddleware, updateProfile);
+router.put(
+  "/profile",
+  authMiddleware,
+  [
+    body("firstName")
+      .trim()
+      .notEmpty()
+      .withMessage("First name is required")
+      .bail()
+      .custom(isNameLike)
+      .withMessage("First name must be 2-50 letters"),
+    body("lastName")
+      .trim()
+      .notEmpty()
+      .withMessage("Last name is required")
+      .bail()
+      .custom(isNameLike)
+      .withMessage("Last name must be 2-50 letters"),
+    body("phoneNumber")
+      .optional({ checkFalsy: true })
+      .custom(isValidPhone)
+      .withMessage("Enter a valid phone number"),
+    body("bio")
+      .optional()
+      .isLength({ max: 500 })
+      .withMessage("Bio must be 500 characters or fewer"),
+    validate,
+  ],
+  updateProfile,
+);
 
 /**
  * @swagger

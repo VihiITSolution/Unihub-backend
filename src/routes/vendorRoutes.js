@@ -9,8 +9,13 @@ const {
 } = require('../controllers/vendorController');
 const { authMiddleware } = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { isValidPhone } = require('../utils/fieldValidators');
 
 const router = express.Router();
+
+// Letters/digits, may contain spaces & &'.,- in the middle; 3-60 chars total,
+// must start/end alphanumeric (rejects things like "@#Store!" or a 1-char name).
+const SHOP_NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9\s&'.,-]{1,58}[a-zA-Z0-9]$/;
 
 /**
  * @swagger
@@ -58,11 +63,20 @@ router.post(
   '/',
   authMiddleware,
   [
-    body('shopName').trim().notEmpty().withMessage('Shop name is required'),
+    body('shopName')
+      .trim()
+      .notEmpty()
+      .withMessage('Shop name is required')
+      .bail()
+      .matches(SHOP_NAME_REGEX)
+      .withMessage('Shop name must be 3-60 characters and start/end with a letter or number'),
     body('shopDescription').optional().isString(),
     body('businessType').optional().isIn(['individual', 'business']),
     body('contactEmail').optional().isEmail().withMessage('Invalid email format'),
-    body('contactPhone').optional().isString(),
+    body('contactPhone')
+      .optional({ checkFalsy: true })
+      .custom(isValidPhone)
+      .withMessage('Enter a valid phone number'),
     validate
   ],
   createVendorProfile
@@ -116,7 +130,24 @@ router.get('/', authMiddleware, getMyVendorProfile);
  *       200:
  *         description: Vendor profile updated successfully
  */
-router.put('/', authMiddleware, updateVendorProfile);
+router.put(
+  '/',
+  authMiddleware,
+  [
+    body('shopName')
+      .optional({ checkFalsy: true })
+      .trim()
+      .matches(SHOP_NAME_REGEX)
+      .withMessage('Shop name must be 3-60 characters and start/end with a letter or number'),
+    body('contactEmail').optional({ checkFalsy: true }).isEmail().withMessage('Invalid email format'),
+    body('contactPhone')
+      .optional({ checkFalsy: true })
+      .custom(isValidPhone)
+      .withMessage('Enter a valid phone number'),
+    validate
+  ],
+  updateVendorProfile,
+);
 
 /**
  * @swagger
