@@ -23,6 +23,26 @@ const StudentProfile = sequelize.define('StudentProfile', {
     allowNull: false,
     field: 'university_name'
   },
+  facultyId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'faculty_id',
+  },
+  customUniversity: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'custom_university',
+  },
+  customFaculty: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'custom_faculty',
+  },
+  customDepartment: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'custom_department',
+  },
   department: {
     type: DataTypes.STRING(255),
     allowNull: false

@@ -22,6 +22,7 @@ const {
   getAllBoardingPlaces,
   approveBoardingPlace,
   rejectBoardingPlace,
+  getSuggestions,
 } = require("../controllers/adminController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 
@@ -631,5 +632,7 @@ router.put(
   authorize("admin"),
   rejectBoardingPlace,
 );
+
+router.get("/suggestions", authMiddleware, authorize("admin"), getSuggestions);
 
 module.exports = router;

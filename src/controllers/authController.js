@@ -50,6 +50,10 @@ const register = async (req, res, next) => {
       await StudentProfile.create({
         userId: user.id,
         universityName: studentProfile.universityName,
+        facultyId: studentProfile.facultyId || null,
+        customUniversity: studentProfile.customUniversity || null,
+        customFaculty: studentProfile.customFaculty || null,
+        customDepartment: studentProfile.customDepartment || null,
         department: studentProfile.department,
         degreeOrCourse: studentProfile.degreeOrCourse,
         studyingArea: studentProfile.studyingArea,

@@ -7,6 +7,7 @@ const {
   TutorProfile,
   CourseContent,
   Department,
+  StudentProfile,
 } = require("../models");
 const Faculty = require("../models/Faculty");
 const BoardingPlace = require("../models/BoardingPlace");
@@ -1145,6 +1146,37 @@ const rejectBoardingPlace = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/admin/suggestions
+ * Returns unique "Other" custom values submitted by students during registration.
+ */
+const getSuggestions = async (req, res, next) => {
+  try {
+    const { Op: SeqOp } = require("sequelize");
+    const rows = await StudentProfile.findAll({
+      where: {
+        [SeqOp.or]: [
+          { customUniversity: { [SeqOp.ne]: null } },
+          { customFaculty:    { [SeqOp.ne]: null } },
+          { customDepartment: { [SeqOp.ne]: null } },
+        ],
+      },
+      attributes: ["customUniversity", "customFaculty", "customDepartment"],
+    });
+
+    const universities = [...new Set(rows.map(r => r.customUniversity).filter(Boolean))];
+    const faculties    = [...new Set(rows.map(r => r.customFaculty).filter(Boolean))];
+    const departments  = [...new Set(rows.map(r => r.customDepartment).filter(Boolean))];
+
+    res.status(200).json({
+      success: true,
+      data: { universities, faculties, departments, total: rows.length },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUserStatus,
@@ -1168,4 +1200,5 @@ module.exports = {
   getAllBoardingPlaces,
   approveBoardingPlace,
   rejectBoardingPlace,
+  getSuggestions,
 };
