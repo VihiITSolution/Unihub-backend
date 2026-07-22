@@ -7,6 +7,7 @@ const {
   deleteCourseContent,
   getContentById,
 } = require("../controllers/courseContentController");
+const { receiveChunk, completeChunkedUpload } = require("../controllers/chunkUploadController");
 const {
   authMiddleware,
   authorize,
@@ -17,6 +18,21 @@ const { uploadVideo } = require("../config/upload");
 const { uploadPDF } = require("../config/cloudinary");
 
 const router = express.Router();
+
+// ── Chunked video upload (bypasses nginx body-size limit) ─────────────────────
+// Must be defined before the generic /:courseId/content route.
+router.post(
+  "/courses/:courseId/content/chunks",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  receiveChunk,
+);
+router.post(
+  "/courses/:courseId/content/chunks/complete",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  completeChunkedUpload,
+);
 
 // Add content to a course
 router.post(

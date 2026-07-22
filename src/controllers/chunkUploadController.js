@@ -1,0 +1,129 @@
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
+const { CourseContent } = require("../models");
+const youtubeUploader = require("../config/youtube");
+
+const uploadsDir = path.join(__dirname, "../../uploads");
+const chunksBaseDir = path.join(uploadsDir, "chunks");
+const videosDir = path.join(uploadsDir, "videos");
+
+[chunksBaseDir, videosDir].forEach((d) => {
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+});
+
+const buildPrivacyEmbedUrl = (videoId) =>
+  `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0`;
+
+// Each chunk is written to uploads/chunks/{uploadId}/chunk-{index}
+const chunkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(chunksBaseDir, req.body.uploadId || "unknown");
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `chunk-${parseInt(req.body.chunkIndex, 10)}`);
+  },
+});
+
+const receiveChunkMiddleware = multer({
+  storage: chunkStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max per chunk
+}).single("chunk");
+
+/** POST /api/courses/:courseId/content/chunks */
+const receiveChunk = (req, res, next) => {
+  receiveChunkMiddleware(req, res, (err) => {
+    if (err) return next(err);
+    if (!req.file)
+      return res.status(400).json({ success: false, message: "No chunk received." });
+    res.json({ success: true });
+  });
+};
+
+/** POST /api/courses/:courseId/content/chunks/complete */
+const completeChunkedUpload = async (req, res, next) => {
+  const chunkDir = path.join(chunksBaseDir, req.body.uploadId || "");
+
+  const cleanup = () => {
+    try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch {}
+  };
+
+  try {
+    const { courseId } = req.params;
+    const { uploadId, totalChunks, fileName, title, type, duration, order, isPreview } = req.body;
+
+    if (!uploadId || !totalChunks || !fileName || !title || !type) {
+      return res.status(400).json({ success: false, message: "Missing required fields." });
+    }
+
+    const n = parseInt(totalChunks, 10);
+    const ext = path.extname(fileName) || ".mp4";
+    const assembledFilename = `video-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const assembledPath = path.join(videosDir, assembledFilename);
+
+    // Concatenate all chunks in order
+    const out = fs.createWriteStream(assembledPath);
+    for (let i = 0; i < n; i++) {
+      const chunkPath = path.join(chunkDir, `chunk-${i}`);
+      if (!fs.existsSync(chunkPath)) {
+        cleanup();
+        return res.status(400).json({ success: false, message: `Missing chunk ${i}. Please retry.` });
+      }
+      out.write(fs.readFileSync(chunkPath));
+    }
+    await new Promise((resolve, reject) => {
+      out.end();
+      out.on("finish", resolve);
+      out.on("error", reject);
+    });
+
+    cleanup();
+
+    // Upload assembled file to YouTube
+    let url;
+    let youtubeVideoId = null;
+
+    try {
+      const ytUrl = await youtubeUploader.uploadVideo(
+        assembledPath,
+        `${title} - Course ${courseId}`,
+        `Course lesson: ${title}`,
+      );
+
+      if (ytUrl.includes("youtube.com/watch?v=")) {
+        youtubeVideoId = ytUrl.split("v=")[1]?.split("&")[0];
+      } else if (ytUrl.includes("youtu.be/")) {
+        youtubeVideoId = ytUrl.split("youtu.be/")[1]?.split("?")[0];
+      }
+
+      url = youtubeVideoId ? buildPrivacyEmbedUrl(youtubeVideoId) : ytUrl;
+    } catch (ytError) {
+      console.error("YouTube upload failed:", ytError.message);
+      try { fs.unlinkSync(assembledPath); } catch {}
+      return res.status(500).json({
+        success: false,
+        message: ytError.message || "Failed to upload video to YouTube.",
+      });
+    }
+
+    const content = await CourseContent.create({
+      courseId,
+      title,
+      type,
+      url,
+      youtubeVideoId,
+      duration: duration ? parseInt(duration, 10) : null,
+      order: order ? parseInt(order, 10) : 0,
+      isPreview: isPreview === "true" || isPreview === true,
+    });
+
+    res.status(201).json({ success: true, message: "Course content added successfully", data: { content } });
+  } catch (error) {
+    cleanup();
+    next(error);
+  }
+};
+
+module.exports = { receiveChunk, completeChunkedUpload };
