@@ -23,6 +23,10 @@ const Message = require("./Message");
 const MessageAttachment = require("./MessageAttachment");
 const BlockedMessageLog = require("./BlockedMessageLog");
 const SupportTicket = require("./SupportTicket");
+const Post = require("./Post");
+const PostLike = require("./PostLike");
+const PostComment = require("./PostComment");
+const Follow = require("./Follow");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -255,9 +259,28 @@ BlockedMessageLog.belongsTo(User, {
   as: "reviewer",
 });
 
+// Social associations
+User.hasMany(Post, { foreignKey: "userId", as: "posts" });
+Post.belongsTo(User, { foreignKey: "userId", as: "author" });
+
+Post.hasMany(PostLike, { foreignKey: "postId", as: "likes" });
+PostLike.belongsTo(Post, { foreignKey: "postId", as: "post" });
+PostLike.belongsTo(User, { foreignKey: "userId", as: "liker" });
+
+Post.hasMany(PostComment, { foreignKey: "postId", as: "comments" });
+PostComment.belongsTo(Post, { foreignKey: "postId", as: "post" });
+PostComment.belongsTo(User, { foreignKey: "userId", as: "author" });
+
+Follow.belongsTo(User, { foreignKey: "followerId", as: "follower" });
+Follow.belongsTo(User, { foreignKey: "followingId", as: "followee" });
+
 module.exports = {
   sequelize,
   User,
+  Post,
+  PostLike,
+  PostComment,
+  Follow,
   Course,
   CourseContent,
   Enrollment,

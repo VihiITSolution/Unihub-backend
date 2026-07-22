@@ -336,7 +336,8 @@ const uploadProfilePhoto = async (req, res, next) => {
     }
 
     const user = await User.findByPk(req.user.id);
-    user.profileImage = req.file.path; // Cloudinary URL
+    const base = (process.env.UPLOADS_PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, "");
+    user.profileImage = `${base}/uploads/avatars/${req.file.filename}`;
     await user.save();
 
     res.status(200).json({

@@ -15,8 +15,10 @@ cloudinary.config({
 const uploadsDir = path.join(__dirname, "../../uploads");
 const thumbnailsDir = path.join(uploadsDir, "thumbnails");
 const videosDir = path.join(uploadsDir, "videos");
+const avatarsDir = path.join(uploadsDir, "avatars");
+const postsDir = path.join(uploadsDir, "posts");
 
-[uploadsDir, thumbnailsDir, videosDir].forEach((dir) => {
+[uploadsDir, thumbnailsDir, videosDir, avatarsDir, postsDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -72,6 +74,86 @@ const videoFilter = function (req, file, cb) {
   } else {
     cb(new Error("Only video files are allowed!"));
   }
+};
+
+// Storage for avatar (profile picture)
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, avatarsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "avatar-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const avatarFilter = (req, file, cb) => {
+  const allowed = /jpeg|jpg|png|gif|webp/;
+  if (file.mimetype.startsWith("image/") && allowed.test(path.extname(file.originalname).toLowerCase())) {
+    return cb(null, true);
+  }
+  cb(new Error("Only image files are allowed for avatars!"));
+};
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  fileFilter: avatarFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("avatar");
+
+// Alias for profile image upload via the auth route (field name: profileImage)
+const profileImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, avatarsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "avatar-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const uploadProfileImage = multer({
+  storage: profileImageStorage,
+  fileFilter: avatarFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("profileImage");
+
+// Storage for post media images
+const postMediaStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, postsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "post-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const uploadPostMedia = multer({
+  storage: postMediaStorage,
+  fileFilter: avatarFilter,
+  limits: { fileSize: 10 * 1024 * 1024, files: 4 },
+}).array("media", 4);
+
+// Storage for PDF course materials
+const pdfsDir = path.join(uploadsDir, "pdfs");
+if (!fs.existsSync(pdfsDir)) fs.mkdirSync(pdfsDir, { recursive: true });
+
+const pdfStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, pdfsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "pdf-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const uploadPDF = multer({
+  storage: pdfStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") return cb(null, true);
+    cb(new Error("Only PDF files are allowed!"));
+  },
+  limits: { fileSize: 50 * 1024 * 1024 },
+}).single("video");
+
+// Helper to build a public URL for uploaded files
+const toPublicUrl = (subfolder, filename) => {
+  const base = (process.env.UPLOADS_PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 5000}`).replace(/\/$/, "");
+  return `${base}/uploads/${subfolder}/${filename}`;
 };
 
 // Thumbnail upload middleware
@@ -143,6 +225,14 @@ module.exports = {
   uploadThumbnail,
   uploadVideo,
   uploadCourseContent,
+  uploadAvatar,
+  uploadProfileImage,
+  uploadPostMedia,
+  uploadPDF,
+  toPublicUrl,
   thumbnailsDir,
   videosDir,
+  avatarsDir,
+  postsDir,
+  pdfsDir,
 };

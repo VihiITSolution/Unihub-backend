@@ -32,6 +32,7 @@ const chatRoutes = require("./routes/chatRoutes");
 const adminChatRoutes = require("./routes/adminChatRoutes");
 const supportRoutes = require("./routes/supportRoutes");
 const statsRoutes = require("./routes/statsRoutes");
+const socialRoutes = require("./routes/socialRoutes");
 
 const app = express();
 
@@ -120,6 +121,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/admin/chat", adminChatRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/social", socialRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

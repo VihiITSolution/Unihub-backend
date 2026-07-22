@@ -14,7 +14,7 @@ const {
 const { authMiddleware } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
-const { uploadProfileImage } = require("../config/cloudinary");
+const { uploadProfileImage } = require("../config/upload");
 const { isValidPhone, hasLetters, isNameLike } = require("../utils/fieldValidators");
 
 const router = express.Router();
