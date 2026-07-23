@@ -29,13 +29,18 @@ const chunkStorage = multer.diskStorage({
 
 const receiveChunkMiddleware = multer({
   storage: chunkStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max per chunk
+  limits: { fileSize: 800 * 1024 }, // 800 KB — frontend sends 512 KB chunks; header overhead keeps total under 1 MB nginx default
 }).single("chunk");
 
 /** POST /api/courses/:courseId/content/chunks */
 const receiveChunk = (req, res, next) => {
   receiveChunkMiddleware(req, res, (err) => {
-    if (err) return next(err);
+    if (err) {
+      const msg = err.code === "LIMIT_FILE_SIZE"
+        ? "Chunk too large. Reduce CHUNK_SIZE in the frontend."
+        : err.message;
+      return res.status(400).json({ success: false, message: msg });
+    }
     if (!req.file)
       return res.status(400).json({ success: false, message: "No chunk received." });
     res.json({ success: true });
