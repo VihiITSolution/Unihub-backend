@@ -405,6 +405,35 @@ const switchRole = async (req, res, next) => {
   }
 };
 
+const deleteAccount = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ success: false, message: "Password is required to confirm account deletion." });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    const valid = await user.comparePassword(password);
+    if (!valid) {
+      return res.status(401).json({ success: false, message: "Incorrect password." });
+    }
+
+    // Soft-delete: deactivate the account and anonymise PII
+    user.isActive = false;
+    user.firstName = "Deleted";
+    user.lastName = "User";
+    user.email = `deleted_${user.id}@deleted.unihub.lk`;
+    user.phoneNumber = null;
+    user.bio = null;
+    user.profileImage = null;
+    await user.save();
+
+    res.json({ success: true, message: "Account deleted successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -415,4 +444,5 @@ module.exports = {
   changePassword,
   uploadProfilePhoto,
   switchRole,
+  deleteAccount,
 };

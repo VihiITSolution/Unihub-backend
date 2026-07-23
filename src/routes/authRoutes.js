@@ -10,6 +10,7 @@ const {
   changePassword,
   uploadProfilePhoto,
   switchRole,
+  deleteAccount,
 } = require("../controllers/authController");
 const { authMiddleware } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimiter");
@@ -297,5 +298,12 @@ router.post(
  *         description: Unauthorized
  */
 router.post("/switch-role", authMiddleware, switchRole);
+
+router.delete(
+  "/account",
+  authMiddleware,
+  [body("password").notEmpty().withMessage("Password is required"), validate],
+  deleteAccount,
+);
 
 module.exports = router;
