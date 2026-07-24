@@ -63,6 +63,10 @@ const seedBoardingData = async () => {
         monthlyRent: 15000,
         contactPhone: '0771234567',
         contactEmail: vendorUser.email,
+        images: [
+          'https://picsum.photos/seed/unihub-room-1a/800/600',
+          'https://picsum.photos/seed/unihub-room-1b/800/600',
+        ],
       },
       {
         title: 'Shared Room for Female Students',
@@ -78,6 +82,10 @@ const seedBoardingData = async () => {
         monthlyRent: 9000,
         contactPhone: '0771234568',
         contactEmail: vendorUser.email,
+        images: [
+          'https://picsum.photos/seed/unihub-room-2a/800/600',
+          'https://picsum.photos/seed/unihub-room-2b/800/600',
+        ],
       },
       {
         title: 'Male Annex Near University of Moratuwa',
@@ -93,6 +101,10 @@ const seedBoardingData = async () => {
         monthlyRent: 20000,
         contactPhone: '0771234569',
         contactEmail: vendorUser.email,
+        images: [
+          'https://picsum.photos/seed/unihub-room-3a/800/600',
+          'https://picsum.photos/seed/unihub-room-3b/800/600',
+        ],
       },
       {
         title: 'Budget Apartment Near University of Kelaniya',
@@ -108,6 +120,10 @@ const seedBoardingData = async () => {
         monthlyRent: 27000,
         contactPhone: '0771234570',
         contactEmail: vendorUser.email,
+        images: [
+          'https://picsum.photos/seed/unihub-room-4a/800/600',
+          'https://picsum.photos/seed/unihub-room-4b/800/600',
+        ],
       },
       {
         title: 'Affordable Single Room in Peradeniya',
@@ -123,6 +139,10 @@ const seedBoardingData = async () => {
         monthlyRent: 8000,
         contactPhone: '0771234571',
         contactEmail: vendorUser.email,
+        images: [
+          'https://picsum.photos/seed/unihub-room-5a/800/600',
+          'https://picsum.photos/seed/unihub-room-5b/800/600',
+        ],
       },
     ];
 

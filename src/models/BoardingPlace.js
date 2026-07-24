@@ -111,6 +111,12 @@ const BoardingPlace = sequelize.define('BoardingPlace', {
     defaultValue: [],
     comment: 'Array of image URLs'
   },
+  videos: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [],
+    comment: 'Array of video URLs'
+  },
   contactPhone: {
     type: DataTypes.STRING(20),
     allowNull: false,

@@ -4,6 +4,66 @@ const VendorProfile = require('../models/VendorProfile');
 const { Op } = require('sequelize');
 const { isFreeTrialActive, calculateFreeTrialExpirationDate } = require('./marketplaceController');
 
+// @desc    Upload images for a boarding place listing
+// @route   POST /api/boarding/upload-images
+// @access  Private (Vendors only)
+exports.uploadBoardingImages = async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No images uploaded'
+      });
+    }
+
+    const images = files.map((file) => file.path);
+
+    res.status(200).json({
+      success: true,
+      message: 'Images uploaded successfully',
+      data: { images }
+    });
+  } catch (error) {
+    console.error('Upload boarding images error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading images',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Upload videos for a boarding place listing
+// @route   POST /api/boarding/upload-videos
+// @access  Private (Vendors only)
+exports.uploadBoardingVideos = async (req, res) => {
+  try {
+    const files = req.files || [];
+    if (files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No videos uploaded'
+      });
+    }
+
+    const videos = files.map((file) => file.path);
+
+    res.status(200).json({
+      success: true,
+      message: 'Videos uploaded successfully',
+      data: { videos }
+    });
+  } catch (error) {
+    console.error('Upload boarding videos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading videos',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Create new boarding place listing
 // @route   POST /api/boarding/places
 // @access  Private (Vendors only)
@@ -23,7 +83,7 @@ exports.createBoardingPlace = async (req, res) => {
     const {
       title, description, address, city, district, nearestUniversity,
       distanceToUniversity, roomType, genderPreference, capacity,
-      monthlyRent, securityDeposit, amenities, rules, images,
+      monthlyRent, securityDeposit, amenities, rules, images, videos,
       contactPhone, contactEmail
     } = req.body;
 
@@ -51,6 +111,7 @@ exports.createBoardingPlace = async (req, res) => {
       amenities: amenities || [],
       rules,
       images: images || [],
+      videos: videos || [],
       contactPhone,
       contactEmail,
       isActive: freeTrial,
@@ -310,7 +371,7 @@ exports.updateBoardingPlace = async (req, res) => {
       'title', 'description', 'address', 'city', 'district',
       'nearestUniversity', 'distanceToUniversity', 'roomType',
       'genderPreference', 'capacity', 'availableSlots', 'monthlyRent',
-      'securityDeposit', 'amenities', 'rules', 'images',
+      'securityDeposit', 'amenities', 'rules', 'images', 'videos',
       'contactPhone', 'contactEmail', 'isActive'
     ];
 

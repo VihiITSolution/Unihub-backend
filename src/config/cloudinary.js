@@ -135,6 +135,57 @@ const uploadMarketplaceImages = multer({
   },
 }).array("images", 5);
 
+// Storage for boarding place images
+const boardingImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/boarding",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    transformation: [{ width: 1600, height: 1600, crop: "limit" }],
+  },
+});
+
+// Boarding image upload middleware - up to 8 images, 5MB each
+const uploadBoardingImages = multer({
+  storage: boardingImageStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 8,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only PNG and JPG images are allowed"));
+    }
+    cb(null, true);
+  },
+}).array("images", 8);
+
+// Storage for boarding place videos
+const boardingVideoStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/boarding-videos",
+    resource_type: "video",
+    allowed_formats: ["mp4", "mov", "avi", "wmv"],
+  },
+});
+
+// Boarding video upload middleware - up to 2 videos, 100MB each
+const uploadBoardingVideos = multer({
+  storage: boardingVideoStorage,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB
+    files: 2,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("video/")) {
+      return cb(new Error("Only video files are allowed"));
+    }
+    cb(null, true);
+  },
+}).array("videos", 2);
+
 module.exports = {
   cloudinary,
   uploadThumbnail,
@@ -143,4 +194,6 @@ module.exports = {
   uploadPDF,
   uploadTicketAttachments,
   uploadMarketplaceImages,
+  uploadBoardingImages,
+  uploadBoardingVideos,
 };
