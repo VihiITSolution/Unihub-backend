@@ -104,8 +104,22 @@ const addCourseContent = async (req, res, next) => {
         });
       }
     } else if (req.body.url) {
-      // Use provided URL (for PDFs or if video URL is manually provided)
-      url = req.body.url;
+      // Use provided URL (for PDFs or if video URL is manually provided).
+      // Linked videos must be an actual YouTube link — the tutor is responsible
+      // for owning/having rights to whatever they link (enforced client-side too).
+      if (type === "video") {
+        const videoId = extractYouTubeVideoId(req.body.url);
+        if (!videoId) {
+          return res.status(400).json({
+            success: false,
+            message: "Only YouTube links (youtube.com or youtu.be) are supported for linked videos.",
+          });
+        }
+        youtubeVideoId = videoId;
+        url = buildPrivacyEmbedUrl(videoId);
+      } else {
+        url = req.body.url;
+      }
     } else if (req.file) {
       // For PDFs - Cloudinary URL is in req.file.path
       url = req.file.path;
