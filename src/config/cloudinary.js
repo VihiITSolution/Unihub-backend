@@ -186,6 +186,57 @@ const uploadBoardingVideos = multer({
   },
 }).array("videos", 2);
 
+// Storage for wall post media (images)
+const postMediaStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/posts",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [{ width: 1600, height: 1600, crop: "limit" }],
+  },
+});
+
+// Wall post media upload middleware - up to 4 images, 10MB each
+const uploadPostMedia = multer({
+  storage: postMediaStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 4,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only image files are allowed for posts"));
+    }
+    cb(null, true);
+  },
+}).array("media", 4);
+
+// Storage for avatar uploads (social wall route, field name: avatar)
+const avatarStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "unihub/avatars",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [{ width: 500, height: 500, crop: "limit" }],
+  },
+});
+
+// Avatar upload middleware
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error("Only image files are allowed for avatars"));
+    }
+    cb(null, true);
+  },
+}).single("avatar");
+
 module.exports = {
   cloudinary,
   uploadThumbnail,
@@ -196,4 +247,6 @@ module.exports = {
   uploadMarketplaceImages,
   uploadBoardingImages,
   uploadBoardingVideos,
+  uploadPostMedia,
+  uploadAvatar,
 };

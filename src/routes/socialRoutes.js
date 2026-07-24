@@ -1,6 +1,6 @@
 const express = require("express");
 const { authMiddleware, optionalAuthMiddleware } = require("../middleware/auth");
-const { uploadPostMedia, uploadAvatar } = require("../config/upload");
+const { uploadPostMedia, uploadAvatar } = require("../config/cloudinary");
 const {
   createPost, getFeed, getUserWall, getPost, deletePost,
   likePost, unlikePost, listComments, addComment, deleteComment,

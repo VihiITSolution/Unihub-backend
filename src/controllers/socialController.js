@@ -1,6 +1,5 @@
 const { Op } = require("sequelize");
 const { Post, PostLike, PostComment, Follow, User, Notification } = require("../models");
-const { toPublicUrl } = require("../config/upload");
 
 const AUTHOR_ATTRS = ["id", "firstName", "lastName", "profileImage", "primaryRole"];
 
@@ -61,7 +60,7 @@ const createPost = async (req, res, next) => {
     }
 
     const media = files.map((file) => ({
-      url: toPublicUrl("posts", file.filename),
+      url: file.path,
       type: "image",
     }));
 
@@ -273,7 +272,7 @@ const uploadAvatar = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: "No image file provided." });
 
-    const profileImage = toPublicUrl("avatars", req.file.filename);
+    const profileImage = req.file.path;
     req.user.profileImage = profileImage;
     await req.user.save();
 
