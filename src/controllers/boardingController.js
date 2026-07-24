@@ -282,7 +282,7 @@ exports.getBoardingPlaceById = async (req, res) => {
       include: [{
         model: User,
         as: 'vendor',
-        attributes: ['id', 'firstName', 'lastName', 'email'],
+        attributes: ['id', 'firstName', 'lastName', 'email', 'profileImage'],
         include: [{
           model: VendorProfile,
           as: 'vendorProfile',
