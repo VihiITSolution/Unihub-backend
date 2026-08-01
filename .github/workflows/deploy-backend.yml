@@ -88,4 +88,4 @@ jobs:
               ${{ secrets.DOCKER_USERNAME }}/unihub-backend:latest
 
             # Clean up old images
-            docker image prune -f
+            docker image prune -a -f

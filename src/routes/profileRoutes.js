@@ -12,6 +12,7 @@ const {
   getPendingTutorApplications,
   reviewTutorApplication
 } = require('../controllers/profileController');
+const { getPreferences, updatePreferences } = require('../controllers/preferencesController');
 
 const TUTOR_BIO_MAX_LENGTH = 1000;
 
@@ -43,5 +44,9 @@ router.put('/tutor', authMiddleware, authorize('tutor'), tutorApplicationValidat
 // Admin routes for tutor approval
 router.get('/tutor/applications', authMiddleware, authorize('admin'), getPendingTutorApplications);
 router.post('/tutor/applications/:tutorProfileId/review', authMiddleware, authorize('admin'), reviewTutorApplication);
+
+// User preferences (notification + privacy)
+router.get('/preferences', authMiddleware, getPreferences);
+router.put('/preferences', authMiddleware, updatePreferences);
 
 module.exports = router;

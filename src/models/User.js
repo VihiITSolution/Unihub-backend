@@ -98,6 +98,18 @@ const User = sequelize.define(
       allowNull: true,
       field: "reset_password_expires",
     },
+    notificationPrefs: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: "notification_prefs",
+      comment: "User notification preferences as JSON",
+    },
+    privacyPrefs: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: "privacy_prefs",
+      comment: "User privacy settings as JSON",
+    },
   },
   {
     tableName: "users",
