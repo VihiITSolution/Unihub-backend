@@ -64,6 +64,24 @@ const runCriticalMigrations = async (sequelizeInstance) => {
     console.error("⚠ Notifications migration error:", migrationError.message);
   }
 
+  // Add preference columns to users table (safe to run on every startup)
+  try {
+    await sequelizeInstance.query(`
+      ALTER TABLE users ADD COLUMN notification_prefs JSON NULL
+    `);
+    console.log("✓ Added notification_prefs column to users.");
+  } catch {
+    // Column already exists — no action needed
+  }
+  try {
+    await sequelizeInstance.query(`
+      ALTER TABLE users ADD COLUMN privacy_prefs JSON NULL
+    `);
+    console.log("✓ Added privacy_prefs column to users.");
+  } catch {
+    // Column already exists — no action needed
+  }
+
   try {
     // Step 3: Create chat tables if they don't exist (correct schema)
     await sequelizeInstance.query(`
