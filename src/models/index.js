@@ -27,6 +27,7 @@ const Post = require("./Post");
 const PostLike = require("./PostLike");
 const PostComment = require("./PostComment");
 const Follow = require("./Follow");
+const CourseNotifyRequest = require("./CourseNotifyRequest");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -259,6 +260,12 @@ BlockedMessageLog.belongsTo(User, {
   as: "reviewer",
 });
 
+// CourseNotifyRequest associations
+User.hasMany(CourseNotifyRequest, { foreignKey: "userId", as: "notifyRequests" });
+CourseNotifyRequest.belongsTo(User, { foreignKey: "userId", as: "user" });
+Course.hasMany(CourseNotifyRequest, { foreignKey: "courseId", as: "notifyRequests" });
+CourseNotifyRequest.belongsTo(Course, { foreignKey: "courseId", as: "course" });
+
 // Social associations
 User.hasMany(Post, { foreignKey: "userId", as: "posts" });
 Post.belongsTo(User, { foreignKey: "userId", as: "author" });
@@ -304,4 +311,5 @@ module.exports = {
   MessageAttachment,
   BlockedMessageLog,
   SupportTicket,
+  CourseNotifyRequest,
 };

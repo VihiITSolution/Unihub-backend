@@ -13,6 +13,7 @@ const { authMiddleware, optionalAuthMiddleware, authorize } = require("../middle
 const { createLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
 const { uploadThumbnail } = require("../config/cloudinary");
+const { toggleNotify, getNotifyStatus } = require("../controllers/courseNotifyController");
 
 const router = express.Router();
 
@@ -223,5 +224,9 @@ router.post(
   authorize("tutor"),
   submitForReview
 );
+
+// Notify me for upcoming courses
+router.post("/:id/notify", authMiddleware, toggleNotify);
+router.get("/:id/notify", authMiddleware, getNotifyStatus);
 
 module.exports = router;
