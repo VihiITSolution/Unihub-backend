@@ -35,6 +35,9 @@ const auditAdminAction = (action, targetType, summary) => (req, res, next) => {
           method: req.method,
           path: req.originalUrl,
           statusCode: res.statusCode,
+          ...(Array.isArray(req.body?.ticketIds)
+            ? { itemCount: Math.min(req.body.ticketIds.length, 50) }
+            : {}),
           ...(Object.keys(changes).length > 0 ? { changes } : {}),
         },
         ipAddress: req.ip || null,

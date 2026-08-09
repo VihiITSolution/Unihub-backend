@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { Op } = require("sequelize");
-const { User, StudentProfile, TutorProfile } = require("../models");
+const { User, StudentProfile, TutorProfile, AdminAuditLog } = require("../models");
 const { generateToken } = require("../utils/token");
 
 /**
@@ -132,9 +132,26 @@ const login = async (req, res, next) => {
     user.lastLogin = new Date();
     await user.save();
 
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+    if (user.primaryRole === "admin" || roles.includes("admin")) {
+      try {
+        await AdminAuditLog.create({
+          actorAdminId: user.id,
+          action: "admin.login",
+          targetType: "session",
+          targetId: String(user.id),
+          summary: "Administrator signed in",
+          metadata: { method: req.method, path: req.originalUrl, statusCode: 200 },
+          ipAddress: req.ip || null,
+          userAgent: String(req.get("user-agent") || "").slice(0, 500) || null,
+        });
+      } catch (auditError) {
+        console.error("Failed to write administrator login audit event:", auditError.message);
+      }
+    }
+
     const token = generateToken(user.id);
 
-    // Transform user data to match frontend expectations
     // Transform user data to match frontend expectations
     const userData = user.toJSON();
     // Ensure roles are available

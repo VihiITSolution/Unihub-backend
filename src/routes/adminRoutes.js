@@ -30,7 +30,9 @@ const {
   getSupportTickets,
   getSupportTicket,
   updateSupportTicket,
+  bulkUpdateSupportTickets,
   getAdminAuditLogs,
+  getSystemStatus,
 } = require("../controllers/adminOperationsController");
 
 const router = express.Router();
@@ -307,91 +309,6 @@ router.get(
 
 /**
  * @swagger
- * /api/admin/courses/{id}/approve:
- *   put:
- *     tags: [Admin]
- *     summary: Approve a course (Admin only)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Course approved
- */
-router.put(
-  "/courses/:id/approve",
-  authMiddleware,
-  authorize("admin"),
-  approveCourse,
-);
-
-/**
- * @swagger
- * /api/admin/courses/{id}/reject:
- *   put:
- *     tags: [Admin]
- *     summary: Reject a course (Admin only)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - reason
- *             properties:
- *               reason:
- *                 type: string
- *     responses:
- *       200:
- *         description: Course rejected
- */
-router.put(
-  "/courses/:id/reject",
-  authMiddleware,
-  authorize("admin"),
-  rejectCourse,
-);
-
-/**
- * @swagger
- * /api/admin/courses/{id}/details:
- *   get:
- *     tags: [Admin]
- *     summary: Get detailed course info for review (Admin only)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Course details with tutor profile
- */
-router.get(
-  "/courses/:id/details",
-  authMiddleware,
-  authorize("admin"),
-  getCourseDetails,
-);
-
-/**
- * @swagger
  * /api/admin/marketplace/pending:
  *   get:
  *     tags: [Admin]
@@ -658,6 +575,13 @@ router.put(
 router.get("/suggestions", authMiddleware, authorize("admin"), getSuggestions);
 
 router.get("/support/tickets", authMiddleware, authorize("admin"), getSupportTickets);
+router.put(
+  "/support/tickets/bulk",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction("support_ticket.bulk_updated", "support_ticket", "Bulk updated support tickets"),
+  bulkUpdateSupportTickets,
+);
 router.get("/support/tickets/:id", authMiddleware, authorize("admin"), getSupportTicket);
 router.put(
   "/support/tickets/:id",
@@ -667,5 +591,6 @@ router.put(
   updateSupportTicket,
 );
 router.get("/audit-logs", authMiddleware, authorize("admin"), getAdminAuditLogs);
+router.get("/system-status", authMiddleware, authorize("admin"), getSystemStatus);
 
 module.exports = router;

@@ -22,19 +22,36 @@ const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
  */
 const getAllUsers = async (req, res, next) => {
   try {
-    const { role, isActive, page = 1, limit = 10 } = req.query;
+    const { role, isActive, search, page = 1, limit = 10 } = req.query;
 
     const where = {};
-    if (role) where.primaryRole = role;
+    if (role) {
+      const allowedRoles = ["student", "tutor", "vendor", "admin"];
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ success: false, message: "Invalid user role filter." });
+      }
+      where.primaryRole = role;
+    }
     if (isActive !== undefined) where.isActive = isActive === "true";
 
-    const offset = (page - 1) * limit;
+    if (search && String(search).trim()) {
+      const term = `%${String(search).trim()}%`;
+      where[Op.or] = [
+        { firstName: { [Op.like]: term } },
+        { lastName: { [Op.like]: term } },
+        { email: { [Op.like]: term } },
+      ];
+    }
+
+    const safePage = Math.max(1, parseInt(page, 10) || 1);
+    const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+    const offset = (safePage - 1) * safeLimit;
 
     const { count, rows: users } = await User.findAndCountAll({
       where,
       attributes: { exclude: ["password"] },
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: safeLimit,
+      offset,
       order: [["createdAt", "DESC"]],
     });
 
@@ -44,9 +61,9 @@ const getAllUsers = async (req, res, next) => {
         users,
         pagination: {
           total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
+          page: safePage,
+          limit: safeLimit,
+          totalPages: Math.ceil(count / safeLimit),
         },
       },
     });
@@ -63,6 +80,22 @@ const updateUserStatus = async (req, res, next) => {
     const { id } = req.params;
     const { isActive, isVerified } = req.body;
 
+    if (isActive === undefined && isVerified === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide an account status or verification change.",
+      });
+    }
+    if (
+      (isActive !== undefined && typeof isActive !== "boolean") ||
+      (isVerified !== undefined && typeof isVerified !== "boolean")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Account status and verification values must be boolean.",
+      });
+    }
+
     if (Number(id) === Number(req.user.id) && isActive === false) {
       return res.status(400).json({
         success: false,
@@ -77,6 +110,18 @@ const updateUserStatus = async (req, res, next) => {
         success: false,
         message: "User not found",
       });
+    }
+
+    if (isActive === false && user.primaryRole === "admin") {
+      const activeAdminCount = await User.count({
+        where: { primaryRole: "admin", isActive: true },
+      });
+      if (activeAdminCount <= 1) {
+        return res.status(400).json({
+          success: false,
+          message: "The final active administrator account cannot be deactivated.",
+        });
+      }
     }
 
     if (isActive !== undefined) user.isActive = isActive;
@@ -115,6 +160,16 @@ const deleteUser = async (req, res, next) => {
         success: false,
         message: "User not found",
       });
+    }
+
+    if (user.primaryRole === "admin") {
+      const adminCount = await User.count({ where: { primaryRole: "admin" } });
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          success: false,
+          message: "The final administrator account cannot be deleted.",
+        });
+      }
     }
 
     await user.destroy();
