@@ -3,6 +3,7 @@ const { body } = require("express-validator");
 const { updateDepartment, deleteDepartment } = require("../controllers/facultyController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 const validate = require("../middleware/validate");
+const { auditAdminAction } = require("../middleware/adminAudit");
 
 const router = express.Router();
 
@@ -11,6 +12,7 @@ router.put(
   "/:id",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("department.updated", "department", "Updated a department"),
   [
     body("name").optional().trim().notEmpty(),
     body("isActive").optional().isBoolean(),
@@ -21,6 +23,6 @@ router.put(
 );
 
 // DELETE /departments/:id  (admin only — soft delete)
-router.delete("/:id", authMiddleware, authorize("admin"), deleteDepartment);
+router.delete("/:id", authMiddleware, authorize("admin"), auditAdminAction("department.deleted", "department", "Deleted a department"), deleteDepartment);
 
 module.exports = router;

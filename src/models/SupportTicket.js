@@ -62,12 +62,41 @@ const SupportTicket = sequelize.define(
       allowNull: false,
       defaultValue: "open",
     },
+    assignedToAdminId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "assigned_to_admin_id",
+    },
+    adminResponse: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "admin_response",
+    },
+    respondedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "responded_at",
+    },
+    resolvedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "resolved_at",
+    },
+    lastUpdatedByAdminId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "last_updated_by_admin_id",
+    },
   },
   {
     tableName: "support_tickets",
     timestamps: true,
     underscored: true,
-    indexes: [{ fields: ["user_id"] }, { fields: ["status"] }],
+    indexes: [
+      { fields: ["user_id"] },
+      { fields: ["status"] },
+      { fields: ["assigned_to_admin_id"] },
+    ],
   },
 );
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const universityController = require('../controllers/universityController');
 const { authMiddleware, authorize } = require('../middleware/auth');
+const { auditAdminAction } = require('../middleware/adminAudit');
 
 /**
  * @swagger
@@ -165,7 +166,7 @@ router.get('/:id', universityController.getUniversityById);
  *       403:
  *         description: Forbidden - Admin access required
  */
-router.post('/', authMiddleware, authorize('admin'), universityController.createUniversity);
+router.post('/', authMiddleware, authorize('admin'), auditAdminAction('university.created', 'university', 'Created a university'), universityController.createUniversity);
 
 /**
  * @swagger
@@ -197,7 +198,7 @@ router.post('/', authMiddleware, authorize('admin'), universityController.create
  *       403:
  *         description: Forbidden - Admin access required
  */
-router.put('/:id', authMiddleware, authorize('admin'), universityController.updateUniversity);
+router.put('/:id', authMiddleware, authorize('admin'), auditAdminAction('university.updated', 'university', 'Updated a university'), universityController.updateUniversity);
 
 /**
  * @swagger
@@ -223,7 +224,7 @@ router.put('/:id', authMiddleware, authorize('admin'), universityController.upda
  *       403:
  *         description: Forbidden - Admin access required
  */
-router.delete('/:id', authMiddleware, authorize('admin'), universityController.deleteUniversity);
+router.delete('/:id', authMiddleware, authorize('admin'), auditAdminAction('university.deleted', 'university', 'Deleted a university'), universityController.deleteUniversity);
 
 /**
  * @swagger
@@ -249,6 +250,6 @@ router.delete('/:id', authMiddleware, authorize('admin'), universityController.d
  *       403:
  *         description: Forbidden - Admin access required
  */
-router.patch('/:id/toggle-status', authMiddleware, authorize('admin'), universityController.toggleUniversityStatus);
+router.patch('/:id/toggle-status', authMiddleware, authorize('admin'), auditAdminAction('university.status_toggled', 'university', 'Toggled university status'), universityController.toggleUniversityStatus);
 
 module.exports = router;

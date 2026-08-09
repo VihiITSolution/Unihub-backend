@@ -9,7 +9,8 @@ const {
   webhookHelaPay,
   verifyBankTransfer
 } = require('../controllers/paymentController');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, authorize } = require('../middleware/auth');
+const { auditAdminAction } = require('../middleware/adminAudit');
 const { createLimiter } = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 
@@ -165,6 +166,8 @@ router.post('/webhook/helapay', webhookHelaPay);
 router.put(
   '/:id/verify',
   authMiddleware,
+  authorize('admin'),
+  auditAdminAction('payment.bank_transfer_reviewed', 'payment', 'Reviewed a bank-transfer payment'),
   [
     body('approved').isBoolean().withMessage('Approved status is required'),
     body('rejectionReason').optional().trim(),

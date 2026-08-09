@@ -25,6 +25,13 @@ const {
   getSuggestions,
 } = require("../controllers/adminController");
 const { authMiddleware, authorize } = require("../middleware/auth");
+const { auditAdminAction } = require("../middleware/adminAudit");
+const {
+  getSupportTickets,
+  getSupportTicket,
+  updateSupportTicket,
+  getAdminAuditLogs,
+} = require("../controllers/adminOperationsController");
 
 const router = express.Router();
 
@@ -91,6 +98,7 @@ router.put(
   "/users/:id/status",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("user.status_updated", "user", "Updated a user account status"),
   updateUserStatus,
 );
 
@@ -112,7 +120,13 @@ router.put(
  *       200:
  *         description: User deleted
  */
-router.delete("/users/:id", authMiddleware, authorize("admin"), deleteUser);
+router.delete(
+  "/users/:id",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction("user.deleted", "user", "Deleted a user account"),
+  deleteUser,
+);
 
 /**
  * @swagger
@@ -202,6 +216,7 @@ router.put(
   "/courses/:id/approve",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("course.approved", "course", "Approved a course"),
   approveCourse,
 );
 
@@ -235,6 +250,7 @@ router.put(
   "/courses/:id/reject",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("course.rejected", "course", "Rejected or disabled a course"),
   rejectCourse,
 );
 
@@ -424,6 +440,7 @@ router.put(
   "/marketplace/:id/approve",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("marketplace.approved", "marketplace_item", "Approved a marketplace item"),
   approveMarketplaceItem,
 );
 
@@ -457,6 +474,7 @@ router.put(
   "/marketplace/:id/reject",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("marketplace.rejected", "marketplace_item", "Rejected a marketplace item"),
   rejectMarketplaceItem,
 );
 
@@ -568,6 +586,7 @@ router.put(
   "/tutor-profiles/:id/approve",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("tutor.approved", "tutor_profile", "Approved a tutor application"),
   approveTutorProfile,
 );
 
@@ -601,6 +620,7 @@ router.put(
   "/tutor-profiles/:id/reject",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("tutor.rejected", "tutor_profile", "Rejected a tutor application"),
   rejectTutorProfile,
 );
 
@@ -623,6 +643,7 @@ router.put(
   "/boarding/places/:id/approve",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("boarding.approved", "boarding_place", "Approved a boarding place"),
   approveBoardingPlace,
 );
 
@@ -630,9 +651,21 @@ router.put(
   "/boarding/places/:id/reject",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("boarding.rejected", "boarding_place", "Rejected a boarding place"),
   rejectBoardingPlace,
 );
 
 router.get("/suggestions", authMiddleware, authorize("admin"), getSuggestions);
+
+router.get("/support/tickets", authMiddleware, authorize("admin"), getSupportTickets);
+router.get("/support/tickets/:id", authMiddleware, authorize("admin"), getSupportTicket);
+router.put(
+  "/support/tickets/:id",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction("support.ticket_updated", "support_ticket", "Updated a support ticket"),
+  updateSupportTicket,
+);
+router.get("/audit-logs", authMiddleware, authorize("admin"), getAdminAuditLogs);
 
 module.exports = router;

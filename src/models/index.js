@@ -29,6 +29,7 @@ const PostComment = require("./PostComment");
 const Follow = require("./Follow");
 const CourseNotifyRequest = require("./CourseNotifyRequest");
 const YouTubeRightsDeclaration = require("./YouTubeRightsDeclaration");
+const AdminAuditLog = require("./AdminAuditLog");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -199,6 +200,16 @@ Review.belongsTo(Course, { foreignKey: "courseId", as: "course" });
 // SupportTicket relationships
 User.hasMany(SupportTicket, { foreignKey: "userId", as: "supportTickets" });
 SupportTicket.belongsTo(User, { foreignKey: "userId", as: "user" });
+SupportTicket.belongsTo(User, {
+  foreignKey: "assignedToAdminId",
+  as: "assignedAdmin",
+});
+SupportTicket.belongsTo(User, {
+  foreignKey: "lastUpdatedByAdminId",
+  as: "lastUpdatedByAdmin",
+});
+User.hasMany(AdminAuditLog, { foreignKey: "actorAdminId", as: "adminAuditLogs" });
+AdminAuditLog.belongsTo(User, { foreignKey: "actorAdminId", as: "actorAdmin" });
 
 // Notification relationships
 User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
@@ -329,4 +340,5 @@ module.exports = {
   SupportTicket,
   CourseNotifyRequest,
   YouTubeRightsDeclaration,
+  AdminAuditLog,
 };

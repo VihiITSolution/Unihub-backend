@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { authMiddleware, authorize } = require("../middleware/auth");
+const { auditAdminAction } = require("../middleware/adminAudit");
 const adminChatController = require("../controllers/adminChatController");
 
 router.get(
@@ -19,6 +20,7 @@ router.put(
   "/conversations/:id/flag",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("chat.flag_updated", "conversation", "Updated a conversation moderation flag"),
   adminChatController.flagConversation,
 );
 router.get(

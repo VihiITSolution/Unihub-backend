@@ -13,6 +13,7 @@ const {
 } = require("../controllers/facultyController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 const validate = require("../middleware/validate");
+const { auditAdminAction } = require("../middleware/adminAudit");
 
 const router = express.Router();
 
@@ -30,6 +31,7 @@ router.post(
   "/",
   authMiddleware,
   authorize("tutor", "admin"),
+  auditAdminAction("faculty.created", "faculty", "Created a faculty"),
   [
     body("name").trim().notEmpty().withMessage("Faculty name is required"),
     body("icon").optional().trim(),
@@ -45,6 +47,7 @@ router.put(
   "/:id",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("faculty.updated", "faculty", "Updated a faculty"),
   [
     body("name").optional().trim().notEmpty(),
     body("icon").optional().trim(),
@@ -57,7 +60,7 @@ router.put(
 );
 
 // DELETE /faculties/:id       (admin only)
-router.delete("/:id", authMiddleware, authorize("admin"), deleteFaculty);
+router.delete("/:id", authMiddleware, authorize("admin"), auditAdminAction("faculty.deleted", "faculty", "Deleted a faculty"), deleteFaculty);
 
 // ── Department sub-routes ─────────────────────────────────────────────────────
 
@@ -69,6 +72,7 @@ router.post(
   "/:id/departments",
   authMiddleware,
   authorize("admin"),
+  auditAdminAction("department.created", "department", "Created a department"),
   [
     body("name").trim().notEmpty().withMessage("Department name is required"),
     body("order").optional().isInt({ min: 0 }),

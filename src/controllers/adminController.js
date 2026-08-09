@@ -9,6 +9,7 @@ const {
   Department,
   StudentProfile,
   YouTubeRightsDeclaration,
+  SupportTicket,
 } = require("../models");
 const Faculty = require("../models/Faculty");
 const BoardingPlace = require("../models/BoardingPlace");
@@ -61,6 +62,13 @@ const updateUserStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { isActive, isVerified } = req.body;
+
+    if (Number(id) === Number(req.user.id) && isActive === false) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot deactivate your own administrator account.",
+      });
+    }
 
     const user = await User.findByPk(id);
 
@@ -149,6 +157,15 @@ const getStatistics = async (req, res, next) => {
     let totalPayments = 0;
     let totalRevenue = 0;
     let totalMarketplaceItems = 0;
+    let operations = {
+      pendingTutorApplications: 0,
+      pendingCourses: 0,
+      pendingMarketplaceItems: 0,
+      pendingBoardingPlaces: 0,
+      pendingBankTransfers: 0,
+      unresolvedSupportTickets: 0,
+      criticalSupportTickets: 0,
+    };
 
     try {
       totalEnrollments = await Enrollment.count();
@@ -168,6 +185,39 @@ const getStatistics = async (req, res, next) => {
       totalMarketplaceItems = await MarketplaceItem.count();
     } catch (e) {
       /* table might not exist */
+    }
+
+    try {
+      const counts = await Promise.all([
+        TutorProfile.count({ where: { approvalStatus: "pending" } }),
+        Course.count({ where: { approvalStatus: "pending" } }),
+        MarketplaceItem.count({
+          where: {
+            approvalStatus: "pending",
+            [Op.or]: [{ isPaid: true }, { isFreeTrialAd: true }],
+          },
+        }),
+        BoardingPlace.count({
+          where: {
+            approvalStatus: "pending",
+            [Op.or]: [{ isPaid: true }, { isFreeTrialAd: true }],
+          },
+        }),
+        Payment.count({ where: { paymentMethod: "bank_transfer", status: "pending" } }),
+        SupportTicket.count({ where: { status: { [Op.in]: ["open", "in_progress"] } } }),
+        SupportTicket.count({ where: { priority: "critical", status: { [Op.in]: ["open", "in_progress"] } } }),
+      ]);
+      operations = {
+        pendingTutorApplications: counts[0],
+        pendingCourses: counts[1],
+        pendingMarketplaceItems: counts[2],
+        pendingBoardingPlaces: counts[3],
+        pendingBankTransfers: counts[4],
+        unresolvedSupportTickets: counts[5],
+        criticalSupportTickets: counts[6],
+      };
+    } catch (e) {
+      /* one of the optional operational tables might not exist yet */
     }
 
     res.status(200).json({
@@ -190,6 +240,7 @@ const getStatistics = async (req, res, next) => {
         marketplace: {
           totalItems: totalMarketplaceItems,
         },
+        operations,
       },
     });
   } catch (error) {
