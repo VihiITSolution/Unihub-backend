@@ -8,6 +8,7 @@ const {
   CourseContent,
   Department,
   StudentProfile,
+  YouTubeRightsDeclaration,
 } = require("../models");
 const Faculty = require("../models/Faculty");
 const BoardingPlace = require("../models/BoardingPlace");
@@ -347,6 +348,11 @@ const getCourseDetails = async (req, res, next) => {
       order: [["order", "ASC"]],
     });
 
+    // Retained signed record for copyright/legal audit of externally linked videos.
+    const youtubeRightsDeclaration = await YouTubeRightsDeclaration.findOne({
+      where: { userId: course.tutorId },
+    });
+
     // Get enrollment stats
     const enrollmentCount = await Enrollment.count({
       where: { courseId: id },
@@ -360,6 +366,7 @@ const getCourseDetails = async (req, res, next) => {
           enrollmentCount,
         },
         courseContent,
+        youtubeRightsDeclaration,
       },
     });
   } catch (error) {

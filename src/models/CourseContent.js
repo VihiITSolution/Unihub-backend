@@ -37,6 +37,22 @@ const CourseContent = sequelize.define(
       field: "youtube_video_id",
       comment: "YouTube video ID for unlisted videos",
     },
+    youtubeRightsDeclarationId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "youtube_rights_declaration_id",
+      references: {
+        model: "youtube_rights_declarations",
+        key: "id",
+      },
+      comment: "Signed declaration covering an externally linked YouTube video",
+    },
+    youtubeRightsConfirmedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "youtube_rights_confirmed_at",
+      comment: "When the tutor confirmed rights for this linked video",
+    },
     duration: {
       type: DataTypes.INTEGER,
       comment: "Duration in minutes for videos",

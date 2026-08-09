@@ -7,6 +7,10 @@ const {
   deleteCourseContent,
   getContentById,
 } = require("../controllers/courseContentController");
+const {
+  getMyYouTubeRightsDeclaration,
+  signYouTubeRightsDeclaration,
+} = require("../controllers/youtubeRightsDeclarationController");
 const { receiveChunk, completeChunkedUpload } = require("../controllers/chunkUploadController");
 const {
   authMiddleware,
@@ -18,6 +22,20 @@ const { uploadVideo } = require("../config/upload");
 const { uploadPDF } = require("../config/cloudinary");
 
 const router = express.Router();
+
+// One-time signed declaration used for all externally linked YouTube lessons.
+router.get(
+  "/youtube-rights-declaration",
+  authMiddleware,
+  authorize("tutor"),
+  getMyYouTubeRightsDeclaration,
+);
+router.post(
+  "/youtube-rights-declaration",
+  authMiddleware,
+  authorize("tutor"),
+  signYouTubeRightsDeclaration,
+);
 
 // ── Chunked video upload (bypasses nginx body-size limit) ─────────────────────
 // Must be defined before the generic /:courseId/content route.

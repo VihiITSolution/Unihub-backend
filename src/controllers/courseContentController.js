@@ -1,4 +1,9 @@
-const { CourseContent, Enrollment, Course } = require("../models");
+const {
+  CourseContent,
+  Enrollment,
+  Course,
+  YouTubeRightsDeclaration,
+} = require("../models");
 const youtubeUploader = require("../config/youtube");
 const path = require("path");
 const fs = require("fs");
@@ -69,8 +74,27 @@ const addCourseContent = async (req, res, next) => {
       });
     }
 
+    const course = await Course.findByPk(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
+    }
+
+    const userRoles = Array.isArray(req.user.roles) ? req.user.roles : [];
+    const isAdmin = userRoles.includes("admin") || req.user.primaryRole === "admin";
+    if (!isAdmin && Number(course.tutorId) !== Number(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only add content to your own courses.",
+      });
+    }
+
     let url;
     let youtubeVideoId = null;
+    let youtubeRightsDeclarationId = null;
+    let youtubeRightsConfirmedAt = null;
 
     if (type === "video" && req.file) {
       // Upload video to YouTube as unlisted
@@ -115,8 +139,32 @@ const addCourseContent = async (req, res, next) => {
             message: "Only YouTube links (youtube.com or youtu.be) are supported for linked videos.",
           });
         }
+
+        const rightsConfirmed =
+          req.body.youtubeRightsConfirmed === true ||
+          req.body.youtubeRightsConfirmed === "true";
+        if (!rightsConfirmed) {
+          return res.status(400).json({
+            success: false,
+            message: "Confirm that this YouTube link is covered by the tutor's signed rights declaration.",
+          });
+        }
+
+        const declaration = await YouTubeRightsDeclaration.findOne({
+          where: { userId: course.tutorId },
+        });
+        if (!declaration) {
+          return res.status(428).json({
+            success: false,
+            code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
+            message: "Sign the YouTube rights declaration before adding an externally hosted video.",
+          });
+        }
+
         youtubeVideoId = videoId;
         url = buildPrivacyEmbedUrl(videoId);
+        youtubeRightsDeclarationId = declaration.id;
+        youtubeRightsConfirmedAt = new Date();
       } else {
         url = req.body.url;
       }
@@ -137,6 +185,8 @@ const addCourseContent = async (req, res, next) => {
       type,
       url,
       youtubeVideoId,
+      youtubeRightsDeclarationId,
+      youtubeRightsConfirmedAt,
       duration: duration || null,
       order: order || 0,
       isPreview: isPreview === "true" || isPreview === true ? true : false,

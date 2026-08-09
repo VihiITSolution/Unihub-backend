@@ -28,6 +28,7 @@ const PostLike = require("./PostLike");
 const PostComment = require("./PostComment");
 const Follow = require("./Follow");
 const CourseNotifyRequest = require("./CourseNotifyRequest");
+const YouTubeRightsDeclaration = require("./YouTubeRightsDeclaration");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -77,6 +78,21 @@ Course.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
 // Course - CourseContent relationship
 Course.hasMany(CourseContent, { foreignKey: "courseId", as: "contents" });
 CourseContent.belongsTo(Course, { foreignKey: "courseId", as: "course" });
+
+// Retained copyright declaration for externally linked YouTube lessons
+User.hasOne(YouTubeRightsDeclaration, {
+  foreignKey: "userId",
+  as: "youtubeRightsDeclaration",
+});
+YouTubeRightsDeclaration.belongsTo(User, { foreignKey: "userId", as: "user" });
+YouTubeRightsDeclaration.hasMany(CourseContent, {
+  foreignKey: "youtubeRightsDeclarationId",
+  as: "courseContents",
+});
+CourseContent.belongsTo(YouTubeRightsDeclaration, {
+  foreignKey: "youtubeRightsDeclarationId",
+  as: "youtubeRightsDeclaration",
+});
 
 // User - Enrollment relationship (Learner enrolls in courses)
 User.hasMany(Enrollment, { foreignKey: "learnerId", as: "enrollments" });
@@ -312,4 +328,5 @@ module.exports = {
   BlockedMessageLog,
   SupportTicket,
   CourseNotifyRequest,
+  YouTubeRightsDeclaration,
 };

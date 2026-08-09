@@ -7,6 +7,7 @@ const { sequelize } = require("./models");
 const { isOriginAllowed } = require("./config/cors");
 const initSocket = require("./socket");
 const runSocialMigrations = require("./migrations/social-tables");
+const createYouTubeRightsDeclarations = require("./migrations/create-youtube-rights-declarations");
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -193,6 +194,7 @@ const startServer = async () => {
     // Run critical migrations (safe to run on every startup)
     await runCriticalMigrations(sequelize);
     await runSocialMigrations(sequelize);
+    await createYouTubeRightsDeclarations();
 
     // Wrap Express in a plain HTTP server so Socket.io can attach to it -
     // Express alone can't handle the WebSocket upgrade handshake.
