@@ -395,17 +395,35 @@ const deleteCourse = async (req, res, next) => {
         await Enrollment.destroy({ where: { courseId: course.id }, transaction });
       }
 
-      await Promise.all([
+      const cleanupTasks = [
         CourseContent.destroy({ where: { courseId: course.id }, transaction }),
         Review.destroy({ where: { courseId: course.id }, transaction }),
-        CourseNotifyRequest.destroy({ where: { courseId: course.id }, transaction }),
         // Sessions are historical scheduling records. Retain them but unlink
         // them from the deleted course.
         LiveSession.update(
           { courseId: null },
           { where: { courseId: course.id }, transaction },
         ),
-      ]);
+      ];
+
+      const [notifyTable] = await sequelize.query(
+        `SELECT 1
+         FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'course_notify_requests'
+         LIMIT 1`,
+        { transaction },
+      );
+      if (notifyTable.length > 0) {
+        cleanupTasks.push(
+          CourseNotifyRequest.destroy({
+            where: { courseId: course.id },
+            transaction,
+          }),
+        );
+      }
+
+      await Promise.all(cleanupTasks);
 
       await course.destroy({ transaction });
       await transaction.commit();

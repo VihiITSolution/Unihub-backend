@@ -9,6 +9,7 @@ const initSocket = require("./socket");
 const runSocialMigrations = require("./migrations/social-tables");
 const createYouTubeRightsDeclarations = require("./migrations/create-youtube-rights-declarations");
 const createAdminOperations = require("./migrations/create-admin-operations");
+const createCourseNotifyRequests = require("./migrations/create-course-notify-requests");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
 
 const PORT = process.env.PORT || 3000;
@@ -198,6 +199,7 @@ const startServer = async () => {
     await runSocialMigrations(sequelize);
     await createYouTubeRightsDeclarations();
     await createAdminOperations();
+    await createCourseNotifyRequests();
 
     // Wrap Express in a plain HTTP server so Socket.io can attach to it -
     // Express alone can't handle the WebSocket upgrade handshake.
