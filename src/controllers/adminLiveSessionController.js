@@ -151,6 +151,39 @@ async function removeRecording(req, res, next) {
   } catch (error) { next(error); }
 }
 
+async function remove(req, res, next) {
+  try {
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+
+    // Stop queued provisioning before removing any provider-side resources.
+    if (session.provider === "teams") {
+      await session.update({ status: "cancelled", providerStatus: "cancelled" });
+      const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
+      if (meeting?.outlookEventId) await provider.cancelMeeting(session.id);
+      if (meeting?.recordingDriveItemId) await provider.removeRecording(session.id, req.user.id);
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      const lockedSession = await LiveSession.findByPk(session.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+      if (!lockedSession) return;
+
+      await Promise.all([
+        SessionEnrollment.destroy({ where: { sessionId: session.id }, transaction }),
+        LiveSessionProviderJob.destroy({ where: { sessionId: session.id }, transaction }),
+        LiveSessionEvent.destroy({ where: { sessionId: session.id }, transaction }),
+        LiveSessionMeeting.destroy({ where: { sessionId: session.id }, transaction }),
+      ]);
+      await lockedSession.destroy({ transaction });
+    });
+
+    res.json({ success: true, message: "Live session permanently deleted" });
+  } catch (error) { next(error); }
+}
+
 async function health(req, res, next) {
   try { res.json({ success: true, data: await provider.checkOrganizerHealth() }); }
   catch (error) { next(error); }
@@ -171,4 +204,4 @@ async function conflict(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { list, calendar, statistics, detail, approve, reject, retry, syncAttendees, syncArtifacts, resendTutorInvitation, removeRecording, health, conflict };
+module.exports = { list, calendar, statistics, detail, approve, reject, retry, syncAttendees, syncArtifacts, resendTutorInvitation, removeRecording, remove, health, conflict };

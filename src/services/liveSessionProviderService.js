@@ -165,7 +165,12 @@ async function attendeesFor(session) {
 
 async function provision(sessionId) {
   const session = await LiveSession.findByPk(sessionId);
-  if (!session || session.provider !== "teams" || session.approvalStatus !== "approved") return;
+  if (
+    !session ||
+    session.provider !== "teams" ||
+    session.approvalStatus !== "approved" ||
+    session.status !== "scheduled"
+  ) return;
   if (!enabled()) throw new Error("Teams live sessions are disabled");
   const organizer = await seedOrganizer();
   if (!organizer?.enabled) throw new Error("No enabled Teams organizer account is configured");
@@ -276,7 +281,11 @@ async function removeRecording(sessionId, actorUserId) {
   const meeting = await LiveSessionMeeting.findOne({ where: { sessionId } });
   if (!meeting?.recordingDriveItemId) throw new Error("No recording is available");
   const organizer = await MeetingOrganizerAccount.findByPk(meeting.organizerAccountId);
-  await graph.deleteDriveItem(organizer.entraUserId || organizer.email, meeting.recordingDriveItemId);
+  try {
+    await graph.deleteDriveItem(organizer.entraUserId || organizer.email, meeting.recordingDriveItemId);
+  } catch (error) {
+    if (error.response?.status !== 404) throw error;
+  }
   await meeting.update({ recordingId: null, recordingDriveItemId: null, recordingWebUrl: null });
   await LiveSession.update({ recordingUrl: null, status: "ended" }, { where: { id: sessionId } });
   await event(sessionId, actorUserId, "recording.deleted");

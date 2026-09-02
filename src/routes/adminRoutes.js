@@ -55,6 +55,7 @@ router.post("/live-sessions", authMiddleware, authorize("admin"), auditAdminActi
 router.get("/live-sessions/:id", authMiddleware, authorize("admin"), adminLiveSessions.detail);
 router.put("/live-sessions/:id", authMiddleware, authorize("admin"), auditAdminAction("live_session.updated", "live_session", "Updated a live session"), liveSessionController.updateLiveSession);
 router.delete("/live-sessions/:id", authMiddleware, authorize("admin"), auditAdminAction("live_session.cancelled", "live_session", "Cancelled a live session"), liveSessionController.cancelLiveSession);
+router.delete("/live-sessions/:id/permanent", authMiddleware, authorize("admin"), auditAdminAction("live_session.deleted", "live_session", "Permanently deleted a live session"), adminLiveSessions.remove);
 router.post("/live-sessions/:id/approve", authMiddleware, authorize("admin"), auditAdminAction("live_session.approved", "live_session", "Approved a live session"), adminLiveSessions.approve);
 router.post("/live-sessions/:id/reject", authMiddleware, authorize("admin"), auditAdminAction("live_session.rejected", "live_session", "Rejected a live session"), adminLiveSessions.reject);
 router.post("/live-sessions/:id/retry", authMiddleware, authorize("admin"), auditAdminAction("live_session.provisioning_retried", "live_session", "Retried live-session provisioning"), adminLiveSessions.retry);
