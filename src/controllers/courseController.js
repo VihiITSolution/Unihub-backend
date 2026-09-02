@@ -1,4 +1,16 @@
-const { Course, User, Enrollment, Category, Department } = require("../models");
+const {
+  sequelize,
+  Course,
+  User,
+  Enrollment,
+  Payment,
+  CourseContent,
+  CourseNotifyRequest,
+  LiveSession,
+  Category,
+  Department,
+  Review,
+} = require("../models");
 const { Op } = require("sequelize");
 
 /**
@@ -351,14 +363,56 @@ const deleteCourse = async (req, res, next) => {
       });
     }
 
-    if (course.tutorId !== req.user.id && req.user.role !== "admin") {
+    const isAdmin =
+      req.user.role === "admin" ||
+      req.user.primaryRole === "admin" ||
+      (Array.isArray(req.user.roles) && req.user.roles.includes("admin"));
+
+    if (course.tutorId !== req.user.id && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: "Not authorized to delete this course",
       });
     }
 
-    await course.destroy();
+    const transaction = await sequelize.transaction();
+    try {
+      const enrollments = await Enrollment.findAll({
+        attributes: ["id"],
+        where: { courseId: course.id },
+        transaction,
+      });
+      const enrollmentIds = enrollments.map((enrollment) => enrollment.id);
+
+      // Preserve payment history while removing the enrolment it previously
+      // referenced. A course can therefore be fully removed without losing
+      // financial records.
+      if (enrollmentIds.length > 0) {
+        await Payment.update(
+          { enrollmentId: null },
+          { where: { enrollmentId: enrollmentIds }, transaction },
+        );
+        await Enrollment.destroy({ where: { courseId: course.id }, transaction });
+      }
+
+      await Promise.all([
+        CourseContent.destroy({ where: { courseId: course.id }, transaction }),
+        Review.destroy({ where: { courseId: course.id }, transaction }),
+        CourseNotifyRequest.destroy({ where: { courseId: course.id }, transaction }),
+        // Sessions are historical scheduling records. Retain them but unlink
+        // them from the deleted course.
+        LiveSession.update(
+          { courseId: null },
+          { where: { courseId: course.id }, transaction },
+        ),
+      ]);
+
+      await course.destroy({ transaction });
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
 
     res.status(200).json({
       success: true,

@@ -27,6 +27,7 @@ const {
 const {
   deleteListing: deleteMarketplaceItem,
 } = require("../controllers/marketplaceController");
+const { deleteCourse } = require("../controllers/courseController");
 const {
   deleteBoardingPlace,
 } = require("../controllers/boardingController");
@@ -195,6 +196,14 @@ router.get("/statistics", authMiddleware, authorize("admin"), getStatistics);
  *         description: List of courses
  */
 router.get("/courses", authMiddleware, authorize("admin"), getAllCourses);
+
+router.delete(
+  "/courses/:id",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction("course.deleted", "course", "Deleted a course"),
+  deleteCourse,
+);
 
 /**
  * @swagger
