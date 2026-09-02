@@ -24,6 +24,9 @@ const {
   rejectBoardingPlace,
   getSuggestions,
 } = require("../controllers/adminController");
+const {
+  deleteListing: deleteMarketplaceItem,
+} = require("../controllers/marketplaceController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 const { auditAdminAction } = require("../middleware/adminAudit");
 const {
@@ -305,6 +308,38 @@ router.get(
   authMiddleware,
   authorize("admin"),
   getAllMarketplaceItems,
+);
+
+/**
+ * @swagger
+ * /api/admin/marketplace/{id}:
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Delete a marketplace item (Admin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Marketplace item deleted
+ *       404:
+ *         description: Marketplace item not found
+ */
+router.delete(
+  "/marketplace/:id",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction(
+    "marketplace.deleted",
+    "marketplace_item",
+    "Deleted a marketplace item",
+  ),
+  deleteMarketplaceItem,
 );
 
 /**
