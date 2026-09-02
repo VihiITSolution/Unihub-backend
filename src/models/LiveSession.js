@@ -172,6 +172,45 @@ const LiveSession = sequelize.define('LiveSession', {
     defaultValue: 0.00,
     field: 'platform_commission',
     comment: 'Platform commission amount earned'
+  },
+  provider: {
+    type: DataTypes.ENUM('youtube', 'teams'),
+    allowNull: false,
+    defaultValue: 'teams',
+    comment: 'Meeting provider. Existing rows are backfilled to youtube.'
+  },
+  approvalStatus: {
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    allowNull: false,
+    defaultValue: 'pending',
+    field: 'approval_status'
+  },
+  providerStatus: {
+    type: DataTypes.ENUM('not_provisioned', 'provisioning', 'ready', 'syncing', 'failed', 'cancelled'),
+    allowNull: false,
+    defaultValue: 'not_provisioned',
+    field: 'provider_status'
+  },
+  rejectionReason: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    field: 'rejection_reason'
+  },
+  approvedBy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'approved_by',
+    references: { model: 'users', key: 'id' }
+  },
+  approvedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'approved_at'
+  },
+  providerSyncedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'provider_synced_at'
   }
 }, {
   tableName: 'live_sessions',
@@ -189,6 +228,9 @@ const LiveSession = sequelize.define('LiveSession', {
     },
     {
       fields: ['scheduled_start_time']
+    },
+    {
+      fields: ['provider', 'approval_status', 'provider_status']
     }
   ]
 });

@@ -17,6 +17,10 @@ router.get(
   liveSessionController.getLiveSessions
 );
 
+router.get('/mine', authMiddleware, authorize('tutor', 'admin'), liveSessionController.getMyLiveSessions);
+router.get('/meeting-identity', authMiddleware, liveSessionController.getMeetingIdentity);
+router.post('/meeting-identity', authMiddleware, liveSessionController.setMeetingIdentity);
+
 router.get(
   '/:id',
   liveSessionController.getLiveSession

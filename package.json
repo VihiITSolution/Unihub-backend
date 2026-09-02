@@ -9,8 +9,9 @@
     "setup-db": "node src/migrations/setup-db.js",
     "migrate": "node src/migrations/migrate.js",
     "migrate:chat": "node src/migrations/create-chat-tables.js",
+    "migrate:teams": "node src/migrations/20260902-teams-live-sessions.js",
     "seed": "node src/migrations/seed.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/live-session-safety.test.js"
   },
   "keywords": [
     "e-learning",

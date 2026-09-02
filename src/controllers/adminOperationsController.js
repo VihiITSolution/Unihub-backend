@@ -299,6 +299,12 @@ const getSystemStatus = async (req, res, next) => {
               ? "configured"
               : "not_configured",
           },
+          teams: {
+            status: configured("TEAMS_TENANT_ID", "TEAMS_CLIENT_ID", "TEAMS_CLIENT_SECRET", "TEAMS_ORGANIZER_EMAIL")
+              ? (process.env.TEAMS_LIVE_ENABLED === "true" ? "enabled" : "configured_disabled")
+              : "not_configured",
+            workerEnabled: process.env.TEAMS_LIVE_WORKER_ENABLED === "true",
+          },
         },
         security: {
           jwtSecretConfigured: Boolean(process.env.JWT_SECRET),

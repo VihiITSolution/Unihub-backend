@@ -9,6 +9,7 @@ const initSocket = require("./socket");
 const runSocialMigrations = require("./migrations/social-tables");
 const createYouTubeRightsDeclarations = require("./migrations/create-youtube-rights-declarations");
 const createAdminOperations = require("./migrations/create-admin-operations");
+const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -212,6 +213,7 @@ const startServer = async () => {
     });
     initSocket(io);
     app.set("io", io);
+    startLiveSessionProviderWorker();
 
     httpServer.listen(PORT, () => {
       console.log(`Server is running on http://${HOST}:${PORT}`);

@@ -49,6 +49,34 @@ const sanitizeContentForClient = (content) => {
   return raw;
 };
 
+const isAdminUser = (user = {}) => {
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  return roles.includes("admin") || user.primaryRole === "admin";
+};
+
+const getManagedContent = async (contentId, user) => {
+  const content = await CourseContent.findByPk(contentId);
+  if (!content) return { status: 404, message: "Content not found" };
+
+  const course = await Course.findByPk(content.courseId);
+  if (!course) return { status: 404, message: "Course not found" };
+
+  if (!isAdminUser(user) && Number(course.tutorId) !== Number(user.id)) {
+    return {
+      status: 403,
+      message: "You can only manage content in your own courses.",
+    };
+  }
+
+  return { content, course };
+};
+
+const parseBoolean = (value) => {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return null;
+};
+
 /**
  * Add content to a course (video lesson or PDF)
  * Videos are automatically uploaded to YouTube as unlisted
@@ -274,30 +302,122 @@ const updateCourseContent = async (req, res, next) => {
     const { contentId } = req.params;
     const { title, url, duration, order, isPublished, isPreview } = req.body;
 
-    const content = await CourseContent.findByPk(contentId);
-
-    if (!content) {
-      return res.status(404).json({
+    const managed = await getManagedContent(contentId, req.user);
+    if (!managed.content) {
+      return res.status(managed.status).json({
         success: false,
-        message: "Content not found",
+        message: managed.message,
       });
     }
 
-    if (title) content.title = title;
-    if (url) content.url = url;
-    if (duration !== undefined) content.duration = duration;
-    if (order !== undefined) content.order = order;
-    if (isPublished !== undefined) content.isPublished = isPublished;
-    if (isPreview !== undefined)
-      content.isPreview =
-        isPreview === "true" || isPreview === true ? true : false;
+    const { content, course } = managed;
+
+    if (title !== undefined) {
+      const normalizedTitle = String(title).trim();
+      if (!normalizedTitle || normalizedTitle.length > 255) {
+        return res.status(400).json({
+          success: false,
+          message: "Title is required and must not exceed 255 characters.",
+        });
+      }
+      content.title = normalizedTitle;
+    }
+
+    if (duration !== undefined) {
+      if (duration === null || duration === "") {
+        content.duration = null;
+      } else {
+        const normalizedDuration = Number(duration);
+        if (!Number.isInteger(normalizedDuration) || normalizedDuration <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Duration must be a positive whole number of minutes.",
+          });
+        }
+        content.duration = normalizedDuration;
+      }
+    }
+
+    if (order !== undefined) {
+      const normalizedOrder = Number(order);
+      if (!Number.isInteger(normalizedOrder) || normalizedOrder < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Display order must be zero or a positive whole number.",
+        });
+      }
+      content.order = normalizedOrder;
+    }
+
+    if (url !== undefined) {
+      if (content.type !== "video") {
+        return res.status(400).json({
+          success: false,
+          message: "A PDF file cannot be replaced from the material details editor.",
+        });
+      }
+
+      const videoId = extractYouTubeVideoId(String(url).trim());
+      if (!videoId) {
+        return res.status(400).json({
+          success: false,
+          message: "Only valid YouTube links can be used for video materials.",
+        });
+      }
+
+      const rightsConfirmed = parseBoolean(req.body.youtubeRightsConfirmed);
+      if (rightsConfirmed !== true) {
+        return res.status(400).json({
+          success: false,
+          message: "Confirm that this YouTube link is covered by the tutor's signed rights declaration.",
+        });
+      }
+
+      const declaration = await YouTubeRightsDeclaration.findOne({
+        where: { userId: course.tutorId },
+      });
+      if (!declaration) {
+        return res.status(428).json({
+          success: false,
+          code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
+          message: "Sign the YouTube rights declaration before changing an externally hosted video.",
+        });
+      }
+
+      content.url = buildPrivacyEmbedUrl(videoId);
+      content.youtubeVideoId = videoId;
+      content.youtubeRightsDeclarationId = declaration.id;
+      content.youtubeRightsConfirmedAt = new Date();
+    }
+
+    if (isPublished !== undefined) {
+      const normalizedPublished = parseBoolean(isPublished);
+      if (normalizedPublished === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Published must be true or false.",
+        });
+      }
+      content.isPublished = normalizedPublished;
+    }
+
+    if (isPreview !== undefined) {
+      const normalizedPreview = parseBoolean(isPreview);
+      if (normalizedPreview === null) {
+        return res.status(400).json({
+          success: false,
+          message: "Preview must be true or false.",
+        });
+      }
+      content.isPreview = normalizedPreview;
+    }
 
     await content.save();
 
     res.status(200).json({
       success: true,
       message: "Content updated successfully",
-      data: { content },
+      data: { content: sanitizeContentForClient(content) },
     });
   } catch (error) {
     next(error);
@@ -311,14 +431,15 @@ const deleteCourseContent = async (req, res, next) => {
   try {
     const { contentId } = req.params;
 
-    const content = await CourseContent.findByPk(contentId);
-
-    if (!content) {
-      return res.status(404).json({
+    const managed = await getManagedContent(contentId, req.user);
+    if (!managed.content) {
+      return res.status(managed.status).json({
         success: false,
-        message: "Content not found",
+        message: managed.message,
       });
     }
+
+    const { content } = managed;
 
     await content.destroy();
 

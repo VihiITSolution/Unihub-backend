@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: unihub-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Build and Deploy Backend
@@ -45,6 +49,14 @@ jobs:
           username: ${{ secrets.DO_USERNAME }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
+            set -euo pipefail
+
+            sudo -n systemctl is-active --quiet nginx
+            if [ "$(docker inspect --format='{{.State.Running}}' unihub-nginx 2>/dev/null || echo false)" = "true" ]; then
+              echo "Deployment aborted: host Nginx and the legacy Docker Nginx cannot run together"
+              exit 1
+            fi
+
             # Login to Docker Hub
             docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
 
@@ -83,9 +95,40 @@ jobs:
               -e YOUTUBE_JAVASCRIPT_ORIGIN=${{ secrets.YOUTUBE_JAVASCRIPT_ORIGIN }} \
               -e YOUTUBE_REDIRECT_URI=${{ secrets.YOUTUBE_REDIRECT_URI }} \
               -e YOUTUBE_REDIRECT_URI_LOCAL=${{ secrets.YOUTUBE_REDIRECT_URI_LOCAL }} \
-              -e YOUTUBE_REFRESH_TOKEN=${{ secrets.YOUTUBE_REFRESH_TOKEN }} \
               -e YOUTUBE_ACCESS_TOKEN=${{ secrets.YOUTUBE_ACCESS_TOKEN }} \
               ${{ secrets.DOCKER_USERNAME }}/unihub-backend:latest
+
+            for attempt in $(seq 1 40); do
+              if [ "$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' unihub-backend)" = "healthy" ]; then
+                break
+              fi
+              if [ "${attempt}" -eq 40 ]; then
+                echo "Backend container did not become healthy"
+                docker logs --tail 150 unihub-backend
+                exit 1
+              fi
+              sleep 2
+            done
+
+            test -x /usr/local/bin/update-docker-hosts.sh
+            sudo -n /usr/local/bin/update-docker-hosts.sh
+            sudo -n nginx -t
+            sudo -n systemctl reload nginx
+
+            for attempt in $(seq 1 15); do
+              if curl --fail --silent --show-error --max-time 15 --insecure \
+                --resolve unihub.lk:443:127.0.0.1 https://unihub.lk/ >/dev/null; then
+                break
+              fi
+              if [ "${attempt}" -eq 15 ]; then
+                echo "Origin smoke test failed after Backend deployment"
+                sudo -n tail -n 100 /var/log/nginx/error.log || true
+                exit 1
+              fi
+              sleep 2
+            done
+
+            docker ps --filter name=unihub-backend --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
 
             # Clean up old images
             docker image prune -a -f

@@ -34,8 +34,27 @@ const {
   getAdminAuditLogs,
   getSystemStatus,
 } = require("../controllers/adminOperationsController");
+const adminLiveSessions = require("../controllers/adminLiveSessionController");
+const liveSessionController = require("../controllers/liveSessionController");
 
 const router = express.Router();
+
+router.get("/live-sessions", authMiddleware, authorize("admin"), adminLiveSessions.list);
+router.get("/live-sessions/calendar", authMiddleware, authorize("admin"), adminLiveSessions.calendar);
+router.get("/live-sessions/statistics", authMiddleware, authorize("admin"), adminLiveSessions.statistics);
+router.get("/live-sessions/health", authMiddleware, authorize("admin"), adminLiveSessions.health);
+router.get("/live-sessions/conflicts", authMiddleware, authorize("admin"), adminLiveSessions.conflict);
+router.post("/live-sessions", authMiddleware, authorize("admin"), auditAdminAction("live_session.created", "live_session", "Created a live session"), liveSessionController.createLiveSession);
+router.get("/live-sessions/:id", authMiddleware, authorize("admin"), adminLiveSessions.detail);
+router.put("/live-sessions/:id", authMiddleware, authorize("admin"), auditAdminAction("live_session.updated", "live_session", "Updated a live session"), liveSessionController.updateLiveSession);
+router.delete("/live-sessions/:id", authMiddleware, authorize("admin"), auditAdminAction("live_session.cancelled", "live_session", "Cancelled a live session"), liveSessionController.cancelLiveSession);
+router.post("/live-sessions/:id/approve", authMiddleware, authorize("admin"), auditAdminAction("live_session.approved", "live_session", "Approved a live session"), adminLiveSessions.approve);
+router.post("/live-sessions/:id/reject", authMiddleware, authorize("admin"), auditAdminAction("live_session.rejected", "live_session", "Rejected a live session"), adminLiveSessions.reject);
+router.post("/live-sessions/:id/retry", authMiddleware, authorize("admin"), auditAdminAction("live_session.provisioning_retried", "live_session", "Retried live-session provisioning"), adminLiveSessions.retry);
+router.post("/live-sessions/:id/sync-attendees", authMiddleware, authorize("admin"), auditAdminAction("live_session.attendees_synced", "live_session", "Queued attendee sync"), adminLiveSessions.syncAttendees);
+router.post("/live-sessions/:id/sync-artifacts", authMiddleware, authorize("admin"), auditAdminAction("live_session.artifacts_synced", "live_session", "Queued artifact sync"), adminLiveSessions.syncArtifacts);
+router.post("/live-sessions/:id/resend-invitation", authMiddleware, authorize("admin"), auditAdminAction("live_session.invitation_resent", "live_session", "Resent tutor Teams invitation"), adminLiveSessions.resendTutorInvitation);
+router.delete("/live-sessions/:id/recording", authMiddleware, authorize("admin"), auditAdminAction("live_session.recording_deleted", "live_session", "Deleted a live-session recording"), adminLiveSessions.removeRecording);
 
 /**
  * @swagger

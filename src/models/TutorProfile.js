@@ -121,6 +121,13 @@ const TutorProfile = sequelize.define(
       defaultValue: false,
       field: "is_profile_complete",
     },
+    teamsEmail: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "teams_email",
+      validate: { isEmail: true },
+      comment: "Email invited into the UniHub Entra tenant for Teams sessions",
+    },
   },
   {
     tableName: "tutor_profiles",

@@ -67,6 +67,33 @@ const SessionEnrollment = sequelize.define('SessionEnrollment', {
     defaultValue: false,
     comment: 'Whether student actually attended'
   },
+  joinLaunchedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'join_launched_at'
+  },
+  providerAttendeeId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'provider_attendee_id'
+  },
+  attendanceIntervals: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    field: 'attendance_intervals'
+  },
+  attendanceSource: {
+    type: DataTypes.ENUM('unihub', 'teams'),
+    allowNull: false,
+    defaultValue: 'unihub',
+    field: 'attendance_source'
+  },
+  attendanceSyncStatus: {
+    type: DataTypes.ENUM('pending', 'synced', 'unmatched', 'failed'),
+    allowNull: false,
+    defaultValue: 'pending',
+    field: 'attendance_sync_status'
+  },
   // Invitation
   invitedBy: {
     type: DataTypes.INTEGER,

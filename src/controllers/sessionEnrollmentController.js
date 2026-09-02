@@ -1,394 +1,134 @@
-const { SessionEnrollment, LiveSession, User } = require('../models');
+const { Op } = require("sequelize");
+const { sequelize, SessionEnrollment, LiveSession, LiveSessionMeeting, User } = require("../models");
+const provider = require("../services/liveSessionProviderService");
+const { publicSession } = require("../utils/liveSessionPresentation");
 
-/**
- * Enroll student in a live session
- * POST /api/live-sessions/:id/enroll
- */
-const enrollInSession = async (req, res, next) => {
+const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
+
+async function enrollInSession(req, res, next) {
   try {
-    const { id } = req.params;
-    const studentId = req.user.id;
-    const { paymentId } = req.body;
-
-    const session = await LiveSession.findByPk(id);
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Live session not found'
-      });
-    }
-
-    // Check if session is scheduled
-    if (session.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: 'This session has been cancelled'
-      });
-    }
-
-    if (session.status === 'ended' || session.status === 'recorded') {
-      return res.status(400).json({
-        success: false,
-        message: 'This session has already ended'
-      });
-    }
-
-    // Check if already enrolled
-    const existingEnrollment = await SessionEnrollment.findOne({
-      where: { sessionId: id, studentId }
-    });
-
-    if (existingEnrollment) {
-      return res.status(400).json({
-        success: false,
-        message: 'Already enrolled in this session'
-      });
-    }
-
-    // Check max attendees limit
-    if (session.maxAttendees) {
-      const enrollmentCount = await SessionEnrollment.count({
-        where: { sessionId: id, paymentStatus: 'completed' }
-      });
-
-      if (enrollmentCount >= session.maxAttendees) {
-        return res.status(400).json({
-          success: false,
-          message: 'Session is full'
-        });
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!req.user.isVerified) return res.status(403).json({ success: false, message: "Verify your UniHub email before enrolling in a Teams session" });
+    if (!session.isFree) return res.status(403).json({ success: false, message: "Paid live-session enrollment is disabled until verified payments are implemented" });
+    if (session.approvalStatus !== "approved" || session.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(session.status)) return res.status(400).json({ success: false, message: "This session is not open for enrollment" });
+    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, req.user.email) : null;
+    const enrollment = await sequelize.transaction(async (transaction) => {
+      const lockedSession = await LiveSession.findByPk(session.id, { transaction, lock: transaction.LOCK.UPDATE });
+      if (lockedSession.approvalStatus !== "approved" || lockedSession.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(lockedSession.status)) {
+        const error = new Error("This session is not open for enrollment"); error.statusCode = 409; throw error;
       }
-    }
-
-    // Handle payment for paid sessions
-    let paymentStatus = 'completed';
-    let amountPaid = 0;
-
-    if (!session.isFree) {
-      amountPaid = parseFloat(session.price);
-      
-      // TODO: Integrate with payment gateway
-      // For now, mark as pending until payment is verified
-      paymentStatus = paymentId ? 'completed' : 'pending';
-      
-      if (!paymentId && paymentStatus === 'pending') {
-        return res.status(400).json({
-          success: false,
-          message: 'Payment required for this session',
-          data: {
-            price: session.price,
-            platformCommissionRate: session.platformCommissionRate
-          }
-        });
+      if (await SessionEnrollment.findOne({ where: { sessionId: session.id, studentId: req.user.id }, transaction })) {
+        const error = new Error("Already enrolled in this session"); error.statusCode = 409; throw error;
       }
-    }
-
-    // Create enrollment
-    const enrollment = await SessionEnrollment.create({
-      sessionId: id,
-      studentId,
-      amountPaid,
-      paymentStatus,
-      paymentId: paymentId || null,
-      invitationStatus: 'accepted'
+      if (lockedSession.maxAttendees) {
+        const count = await SessionEnrollment.count({ where: { sessionId: session.id, paymentStatus: "completed" }, transaction });
+        if (count >= lockedSession.maxAttendees) { const error = new Error("Session is full"); error.statusCode = 409; throw error; }
+      }
+      return SessionEnrollment.create({
+        sessionId: session.id, studentId: req.user.id, amountPaid: 0,
+        paymentStatus: "completed", invitationStatus: "accepted", attendanceSyncStatus: "pending",
+      }, { transaction });
     });
-
-    // Update session revenue
-    if (paymentStatus === 'completed' && !session.isFree) {
-      const platformCommission = (amountPaid * session.platformCommissionRate) / 100;
-      session.totalRevenue += amountPaid;
-      session.platformCommission += platformCommission;
-      session.totalAttendees += 1;
-      await session.save();
-    }
-
+    if (session.provider === "teams") await provider.enqueue(session.id, "attendee_sync");
     res.status(201).json({
       success: true,
-      message: 'Successfully enrolled in live session',
-      data: { enrollment }
+      message: identity?.invitationStatus === "accepted" ? "Enrolled successfully" : "Enrolled. Accept the Microsoft invitation before joining.",
+      data: { enrollment, identity: identity ? { email: identity.email, invitationStatus: identity.invitationStatus, invitationRedeemUrl: identity.invitationRedeemUrl } : null },
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  } catch (error) { next(error); }
+}
 
-/**
- * Invite students to a session
- * POST /api/live-sessions/:id/invite
- */
-const inviteStudents = async (req, res, next) => {
+async function inviteStudents(req, res, next) {
   try {
-    const { id } = req.params;
-    const tutorId = req.user.id;
-    const { studentIds } = req.body; // Array of student IDs
-
-    const session = await LiveSession.findByPk(id);
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Live session not found'
-      });
-    }
-
-    if (session.tutorId !== tutorId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to invite students to this session'
-      });
-    }
-
-    if (!Array.isArray(studentIds) || studentIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student IDs array is required'
-      });
-    }
-
-    const invitations = [];
-
-    for (const studentId of studentIds) {
-      // Check if already enrolled or invited
-      const existing = await SessionEnrollment.findOne({
-        where: { sessionId: id, studentId }
-      });
-
-      if (!existing) {
-        const invitation = await SessionEnrollment.create({
-          sessionId: id,
-          studentId,
-          invitedBy: tutorId,
-          invitationStatus: 'pending',
-          amountPaid: 0,
-          paymentStatus: session.isFree ? 'completed' : 'pending'
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!isAdmin(req.user) && session.tutorId !== req.user.id) return res.status(403).json({ success: false, message: "Not authorized to invite students" });
+    if (!session.isFree) return res.status(403).json({ success: false, message: "Invitations for paid live sessions are disabled" });
+    if (!Array.isArray(req.body.studentIds) || !req.body.studentIds.length) return res.status(400).json({ success: false, message: "studentIds must be a non-empty array" });
+    const students = await User.findAll({ where: { id: { [Op.in]: req.body.studentIds }, isVerified: true } });
+    let invited = 0;
+    const failed = [];
+    for (const student of students) {
+      try {
+        if (session.provider === "teams") await provider.ensureIdentity(student, student.email);
+        const [, created] = await SessionEnrollment.findOrCreate({
+          where: { sessionId: session.id, studentId: student.id },
+          defaults: { invitedBy: req.user.id, invitationStatus: "pending", amountPaid: 0, paymentStatus: "completed" },
         });
-        invitations.push(invitation);
-
-        // TODO: Send invitation email/notification
-      }
+        if (created) invited += 1;
+      } catch (error) { failed.push({ studentId: student.id, message: error.message }); }
     }
+    if (session.provider === "teams") await provider.enqueue(session.id, "attendee_sync");
+    res.json({ success: true, message: `Sent ${invited} invitations`, data: { invited, failed } });
+  } catch (error) { next(error); }
+}
 
-    res.json({
-      success: true,
-      message: `Sent ${invitations.length} invitations`,
-      data: { invitations }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Get student's enrollments
- * GET /api/my-live-sessions
- */
-const getMyEnrollments = async (req, res, next) => {
+async function getMyEnrollments(req, res, next) {
   try {
-    const studentId = req.user.id;
-    const { status, upcoming, past } = req.query;
-
-    const where = { studentId };
     const sessionWhere = {};
-    const now = new Date();
-
-    if (upcoming === 'true') {
-      sessionWhere.scheduledStartTime = { [require('sequelize').Op.gt]: now };
-      sessionWhere.status = { [require('sequelize').Op.in]: ['scheduled', 'live'] };
-    }
-    if (past === 'true') {
-      sessionWhere.scheduledEndTime = { [require('sequelize').Op.lt]: now };
-      sessionWhere.status = { [require('sequelize').Op.in]: ['ended', 'recorded'] };
-    }
-
+    if (req.query.upcoming === "true") { sessionWhere.scheduledEndTime = { [Op.gt]: new Date() }; sessionWhere.status = { [Op.in]: ["scheduled", "live"] }; }
+    if (req.query.past === "true") { sessionWhere.scheduledEndTime = { [Op.lt]: new Date() }; sessionWhere.status = { [Op.in]: ["ended", "recorded"] }; }
     const enrollments = await SessionEnrollment.findAll({
-      where,
-      include: [
-        {
-          model: LiveSession,
-          as: 'session',
-          where: Object.keys(sessionWhere).length > 0 ? sessionWhere : undefined,
-          include: [
-            {
-              model: User,
-              as: 'tutor',
-              attributes: ['id', 'firstName', 'lastName', 'profileImage']
-            }
-          ]
-        }
-      ],
-      order: [['createdAt', 'DESC']]
+      where: { studentId: req.user.id },
+      include: [{ model: LiveSession, as: "session", where: Object.keys(sessionWhere).length ? sessionWhere : undefined, include: [{ model: User, as: "tutor", attributes: ["id", "firstName", "lastName", "profileImage"] }] }],
+      order: [["createdAt", "DESC"]],
     });
+    res.json({ success: true, data: { enrollments: enrollments.map((item) => ({ ...item.toJSON(), session: publicSession(item.session) })) } });
+  } catch (error) { next(error); }
+}
 
-    res.json({
-      success: true,
-      data: { enrollments }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Join live session (mark attendance)
- * POST /api/live-sessions/:id/join
- */
-const joinSession = async (req, res, next) => {
+async function joinSession(req, res, next) {
   try {
-    const { id } = req.params;
-    const studentId = req.user.id;
-
-    const session = await LiveSession.findByPk(id);
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Live session not found'
-      });
-    }
-
-    if (session.status !== 'live') {
-      return res.status(400).json({
-        success: false,
-        message: 'Session is not live yet'
-      });
-    }
-
-    const enrollment = await SessionEnrollment.findOne({
-      where: { sessionId: id, studentId }
-    });
-
-    if (!enrollment) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not enrolled in this session'
-      });
-    }
-
-    if (enrollment.paymentStatus !== 'completed') {
-      return res.status(403).json({
-        success: false,
-        message: 'Payment required to join this session'
-      });
-    }
-
-    // Mark as joined
-    if (!enrollment.joinedAt) {
-      enrollment.joinedAt = new Date();
-      enrollment.attended = true;
-      await enrollment.save();
-    }
-
-    // Return streaming URLs
-    res.json({
-      success: true,
-      message: 'Joined session successfully',
-      data: {
-        watchUrl: `https://www.youtube.com/watch?v=${session.youtubeVideoId}`,
-        embedUrl: `https://www.youtube-nocookie.com/embed/${session.youtubeVideoId}?autoplay=1&rel=0&modestbranding=1`,
-        chatUrl: session.enableChat ? `https://www.youtube.com/live_chat?v=${session.youtubeVideoId}` : null,
-        session
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (session.status !== "live" || session.approvalStatus !== "approved" || session.providerStatus !== "ready") return res.status(400).json({ success: false, message: "Session is not live and ready" });
+    const enrollment = await SessionEnrollment.findOne({ where: { sessionId: session.id, studentId: req.user.id, paymentStatus: "completed" } });
+    if (!enrollment) return res.status(403).json({ success: false, message: "A completed enrollment is required" });
+    if (session.provider === "teams") {
+      const identity = await provider.getIdentityStatus(req.user);
+      if (!identity || identity.invitationStatus !== "accepted" || identity.email.toLowerCase() !== req.user.email.toLowerCase()) {
+        return res.status(403).json({ success: false, message: "Accept the Microsoft invitation and sign in with your verified UniHub email before joining", data: { identityStatus: identity?.invitationStatus || "not_invited", invitationRedeemUrl: identity?.invitationRedeemUrl || null } });
       }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Leave live session
- * POST /api/live-sessions/:id/leave
- */
-const leaveSession = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const studentId = req.user.id;
-
-    const enrollment = await SessionEnrollment.findOne({
-      where: { sessionId: id, studentId }
-    });
-
-    if (!enrollment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Enrollment not found'
-      });
+      const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
+      if (!meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });
+      await enrollment.update({ joinLaunchedAt: new Date() });
+      await provider.enqueue(session.id, "attendee_sync");
+      return res.json({ success: true, message: "Open Microsoft Teams to join", data: { provider: "teams", launchMode: "external", joinUrl: meeting.joinUrl, session: publicSession(session) } });
     }
-
-    if (enrollment.joinedAt && !enrollment.leftAt) {
-      enrollment.leftAt = new Date();
-      const duration = Math.floor((enrollment.leftAt - enrollment.joinedAt) / 60000); // minutes
-      enrollment.attendanceDuration = duration;
-      await enrollment.save();
-    }
-
+    await enrollment.update({ joinedAt: enrollment.joinedAt || new Date(), attended: true });
     res.json({
-      success: true,
-      message: 'Left session successfully',
-      data: { enrollment }
+      success: true, message: "Joined live session",
+      data: { provider: "youtube", launchMode: "embed", embedUrl: session.youtubeVideoId ? `https://www.youtube.com/embed/${session.youtubeVideoId}?autoplay=1` : null, chatUrl: session.enableChat && session.youtubeVideoId ? `https://www.youtube.com/live_chat?v=${session.youtubeVideoId}&embed_domain=${req.hostname}` : null, session: publicSession(session) },
     });
-  } catch (error) {
-    next(error);
-  }
-};
+  } catch (error) { next(error); }
+}
 
-/**
- * Get session enrollments (for tutors)
- * GET /api/live-sessions/:id/enrollments
- */
-const getSessionEnrollments = async (req, res, next) => {
+async function leaveSession(req, res, next) {
   try {
-    const { id } = req.params;
-    const tutorId = req.user.id;
-
-    const session = await LiveSession.findByPk(id);
-
-    if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Live session not found'
-      });
+    const enrollment = await SessionEnrollment.findOne({ where: { sessionId: req.params.id, studentId: req.user.id } });
+    if (!enrollment) return res.status(404).json({ success: false, message: "Enrollment not found" });
+    const session = await LiveSession.findByPk(req.params.id);
+    if (session?.provider === "youtube" && enrollment.joinedAt) {
+      const leftAt = new Date();
+      await enrollment.update({ leftAt, attendanceDuration: Math.max(0, Math.round((leftAt - enrollment.joinedAt) / 60_000)) });
     }
+    res.json({ success: true, message: session?.provider === "teams" ? "Teams attendance will be imported after the meeting" : "Left live session", data: { enrollment } });
+  } catch (error) { next(error); }
+}
 
-    if (session.tutorId !== tutorId && !req.user.roles.includes('admin')) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to view enrollments'
-      });
-    }
-
+async function getSessionEnrollments(req, res, next) {
+  try {
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!isAdmin(req.user) && session.tutorId !== req.user.id) return res.status(403).json({ success: false, message: "Not authorized to view enrollments" });
     const enrollments = await SessionEnrollment.findAll({
-      where: { sessionId: id },
-      include: [
-        {
-          model: User,
-          as: 'student',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'profileImage']
-        }
-      ],
-      order: [['createdAt', 'ASC']]
+      where: { sessionId: session.id },
+      include: [{ model: User, as: "student", attributes: ["id", "firstName", "lastName", "email", "profileImage"] }],
+      order: [["createdAt", "DESC"]],
     });
+    res.json({ success: true, data: { enrollments } });
+  } catch (error) { next(error); }
+}
 
-    const stats = {
-      total: enrollments.length,
-      paid: enrollments.filter(e => e.paymentStatus === 'completed').length,
-      attended: enrollments.filter(e => e.attended).length,
-      totalRevenue: enrollments.reduce((sum, e) => sum + parseFloat(e.amountPaid), 0)
-    };
-
-    res.json({
-      success: true,
-      data: { enrollments, stats }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-module.exports = {
-  enrollInSession,
-  inviteStudents,
-  getMyEnrollments,
-  joinSession,
-  leaveSession,
-  getSessionEnrollments
-};
+module.exports = { enrollInSession, inviteStudents, getMyEnrollments, joinSession, leaveSession, getSessionEnrollments };

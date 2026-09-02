@@ -30,6 +30,11 @@ const Follow = require("./Follow");
 const CourseNotifyRequest = require("./CourseNotifyRequest");
 const YouTubeRightsDeclaration = require("./YouTubeRightsDeclaration");
 const AdminAuditLog = require("./AdminAuditLog");
+const MeetingOrganizerAccount = require("./MeetingOrganizerAccount");
+const LiveSessionMeeting = require("./LiveSessionMeeting");
+const UserMeetingIdentity = require("./UserMeetingIdentity");
+const LiveSessionProviderJob = require("./LiveSessionProviderJob");
+const LiveSessionEvent = require("./LiveSessionEvent");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -164,6 +169,24 @@ LiveSession.belongsTo(User, { foreignKey: "tutorId", as: "tutor" });
 
 Course.hasMany(LiveSession, { foreignKey: "courseId", as: "liveSessions" });
 LiveSession.belongsTo(Course, { foreignKey: "courseId", as: "course" });
+
+User.hasMany(LiveSession, { foreignKey: "approvedBy", as: "approvedLiveSessions" });
+LiveSession.belongsTo(User, { foreignKey: "approvedBy", as: "liveSessionApprover" });
+
+LiveSession.hasOne(LiveSessionMeeting, { foreignKey: "sessionId", as: "meeting" });
+LiveSessionMeeting.belongsTo(LiveSession, { foreignKey: "sessionId", as: "session" });
+MeetingOrganizerAccount.hasMany(LiveSessionMeeting, { foreignKey: "organizerAccountId", as: "meetings" });
+LiveSessionMeeting.belongsTo(MeetingOrganizerAccount, { foreignKey: "organizerAccountId", as: "organizer" });
+
+User.hasMany(UserMeetingIdentity, { foreignKey: "userId", as: "meetingIdentities" });
+UserMeetingIdentity.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+LiveSession.hasMany(LiveSessionProviderJob, { foreignKey: "sessionId", as: "providerJobs" });
+LiveSessionProviderJob.belongsTo(LiveSession, { foreignKey: "sessionId", as: "session" });
+LiveSession.hasMany(LiveSessionEvent, { foreignKey: "sessionId", as: "events" });
+LiveSessionEvent.belongsTo(LiveSession, { foreignKey: "sessionId", as: "session" });
+User.hasMany(LiveSessionEvent, { foreignKey: "actorUserId", as: "liveSessionEvents" });
+LiveSessionEvent.belongsTo(User, { foreignKey: "actorUserId", as: "actor" });
 
 LiveSession.hasMany(SessionEnrollment, {
   foreignKey: "sessionId",
@@ -326,6 +349,11 @@ module.exports = {
   Order,
   LiveSession,
   SessionEnrollment,
+  MeetingOrganizerAccount,
+  LiveSessionMeeting,
+  UserMeetingIdentity,
+  LiveSessionProviderJob,
+  LiveSessionEvent,
   BoardingPlace,
   Review,
   Faculty,
