@@ -27,6 +27,9 @@ const {
 const {
   deleteListing: deleteMarketplaceItem,
 } = require("../controllers/marketplaceController");
+const {
+  deleteBoardingPlace,
+} = require("../controllers/boardingController");
 const { authMiddleware, authorize } = require("../middleware/auth");
 const { auditAdminAction } = require("../middleware/adminAudit");
 const {
@@ -608,6 +611,18 @@ router.get(
   authMiddleware,
   authorize("admin"),
   getPendingBoardingPlaces,
+);
+
+router.delete(
+  "/boarding/places/:id",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction(
+    "boarding.deleted",
+    "boarding_place",
+    "Deleted a boarding place",
+  ),
+  deleteBoardingPlace,
 );
 
 router.put(

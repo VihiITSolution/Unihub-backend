@@ -400,7 +400,7 @@ exports.updateBoardingPlace = async (req, res) => {
 
 // @desc    Delete boarding place
 // @route   DELETE /api/boarding/places/:id
-// @access  Private (Vendors only)
+// @access  Private (Listing owner or admin)
 exports.deleteBoardingPlace = async (req, res) => {
   try {
     const { id } = req.params;
@@ -415,8 +415,12 @@ exports.deleteBoardingPlace = async (req, res) => {
       });
     }
 
-    // Check ownership
-    if (place.vendorId !== userId) {
+    const isAdmin =
+      req.user.primaryRole === 'admin' ||
+      (Array.isArray(req.user.roles) && req.user.roles.includes('admin'));
+
+    // Only the listing owner or an administrator can permanently delete it.
+    if (place.vendorId !== userId && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized'
