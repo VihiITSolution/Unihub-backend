@@ -13,11 +13,29 @@ async function migrate() {
 
   await sequelize.transaction(async (transaction) => {
     const query = (sql) => sequelize.query(sql, { transaction });
-    try { await query("ALTER TABLE users ADD COLUMN verified_phone_number VARCHAR(16) NULL"); } catch (error) { if (error.code !== "ER_DUP_FIELDNAME") throw error; }
-    try { await query("ALTER TABLE users ADD COLUMN phone_verified_at DATETIME NULL"); } catch (error) { if (error.code !== "ER_DUP_FIELDNAME") throw error; }
-    try { await query("ALTER TABLE users ADD UNIQUE INDEX users_verified_phone_number_unique (verified_phone_number)"); } catch (error) { if (error.code !== "ER_DUP_KEYNAME") throw error; }
-    try { await query("ALTER TABLE student_profiles ADD COLUMN student_email VARCHAR(255) NULL"); } catch (error) { if (error.code !== "ER_DUP_FIELDNAME") throw error; }
-    try { await query("ALTER TABLE student_profiles ADD COLUMN student_email_verified_at DATETIME NULL"); } catch (error) { if (error.code !== "ER_DUP_FIELDNAME") throw error; }
+    const hasColumn = async (table, column) => {
+      const [rows] = await sequelize.query(`SHOW COLUMNS FROM ${table} LIKE ?`, { replacements: [column], transaction });
+      return rows.length > 0;
+    };
+    const hasIndex = async (table, index) => {
+      const [rows] = await sequelize.query(`SHOW INDEX FROM ${table} WHERE Key_name = ?`, { replacements: [index], transaction });
+      return rows.length > 0;
+    };
+    if (!(await hasColumn("users", "verified_phone_number"))) await query("ALTER TABLE users ADD COLUMN verified_phone_number VARCHAR(16) NULL");
+    if (!(await hasColumn("users", "phone_verified_at"))) await query("ALTER TABLE users ADD COLUMN phone_verified_at DATETIME NULL");
+    if (!(await hasIndex("users", "users_verified_phone_number_unique"))) {
+      try {
+        await query("ALTER TABLE users ADD UNIQUE INDEX users_verified_phone_number_unique (verified_phone_number)");
+      } catch (error) {
+        // This legacy users table may already be at MySQL's 64-index limit.
+        // The service still rejects duplicate verified numbers; do not delete
+        // an unrelated index during an authentication rollout.
+        if (error.code !== "ER_TOO_MANY_KEYS" && !/too many keys specified/i.test(error.message || "")) throw error;
+        console.warn("Could not add verified-phone unique index: users table is at MySQL's index limit.");
+      }
+    }
+    if (!(await hasColumn("student_profiles", "student_email"))) await query("ALTER TABLE student_profiles ADD COLUMN student_email VARCHAR(255) NULL");
+    if (!(await hasColumn("student_profiles", "student_email_verified_at"))) await query("ALTER TABLE student_profiles ADD COLUMN student_email_verified_at DATETIME NULL");
     await query(`CREATE TABLE IF NOT EXISTS verification_challenges (
       id CHAR(36) PRIMARY KEY,
       purpose ENUM('registration_phone','phone_change','student_email') NOT NULL,

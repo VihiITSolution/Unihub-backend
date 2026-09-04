@@ -52,7 +52,6 @@ const User = sequelize.define(
     },
     verifiedPhoneNumber: {
       type: DataTypes.STRING(16),
-      unique: true,
       allowNull: true,
       field: "verified_phone_number",
     },
