@@ -103,6 +103,9 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
     await deliverSms(challenge, code);
     res.status(202).json({ success: true, message: "Verification code sent", data: responseForChallenge(challenge) });
   } catch (error) {
+    if (error.code === "SMSGO_DELIVERY_FAILED") {
+      return res.status(502).json({ success: false, message: error.message });
+    }
     if (error.message.includes("Too many") || error.message.includes("configured")) return res.status(429).json({ success: false, message: error.message.includes("Too many") ? error.message : "Unable to send verification code. Please try again later." });
     next(error);
   }
