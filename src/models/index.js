@@ -35,10 +35,13 @@ const LiveSessionMeeting = require("./LiveSessionMeeting");
 const UserMeetingIdentity = require("./UserMeetingIdentity");
 const LiveSessionProviderJob = require("./LiveSessionProviderJob");
 const LiveSessionEvent = require("./LiveSessionEvent");
+const VerificationChallenge = require("./VerificationChallenge");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
 StudentProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
+User.hasMany(VerificationChallenge, { foreignKey: "userId", as: "verificationChallenges" });
+VerificationChallenge.belongsTo(User, { foreignKey: "userId", as: "user" });
 
 User.hasOne(TutorProfile, { foreignKey: "userId", as: "tutorProfile" });
 TutorProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
@@ -369,4 +372,5 @@ module.exports = {
   CourseNotifyRequest,
   YouTubeRightsDeclaration,
   AdminAuditLog,
+  VerificationChallenge,
 };

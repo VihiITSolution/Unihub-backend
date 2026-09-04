@@ -11,6 +11,7 @@ const createYouTubeRightsDeclarations = require("./migrations/create-youtube-rig
 const createAdminOperations = require("./migrations/create-admin-operations");
 const createCourseNotifyRequests = require("./migrations/create-course-notify-requests");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
+const { deleteExpiredChallenges } = require("./services/verification.service");
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -216,6 +217,10 @@ const startServer = async () => {
     initSocket(io);
     app.set("io", io);
     startLiveSessionProviderWorker();
+    // Verification challenges contain only short-lived state. Cleanup is best-effort
+    // and intentionally never blocks application startup.
+    deleteExpiredChallenges().catch((error) => console.warn("Verification cleanup failed:", error.message));
+    setInterval(() => deleteExpiredChallenges().catch((error) => console.warn("Verification cleanup failed:", error.message)), 60 * 60 * 1000).unref();
 
     httpServer.listen(PORT, () => {
       console.log(`Server is running on http://${HOST}:${PORT}`);

@@ -12,6 +12,15 @@ const {
   switchRole,
   deleteAccount,
 } = require("../controllers/authController");
+const {
+  startRegistrationPhoneVerification,
+  resendRegistrationPhoneVerification,
+  verifyRegistrationPhone,
+  startPhoneChange,
+  verifyPhoneChange,
+  startStudentEmailVerification,
+  verifyStudentEmail,
+} = require("../controllers/verificationController");
 const { authMiddleware } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
@@ -57,44 +66,16 @@ const router = express.Router();
  *       201:
  *         description: User registered successfully
  */
-router.post(
-  "/register",
-  authLimiter,
-  [
-    body("firstName").trim().notEmpty().withMessage("First name is required"),
-    body("lastName").trim().notEmpty().withMessage("Last name is required"),
-    body("email").isEmail().withMessage("Valid email is required"),
-    body("password")
-      .isLength({ min: 6 })
-      .withMessage("Password must be at least 6 characters"),
-    body("role")
-      .optional()
-      .isIn(["student", "tutor"])
-      .withMessage("Invalid role"),
-    body("phoneNumber")
-      .optional({ checkFalsy: true })
-      .custom(isValidPhone)
-      .withMessage("Enter a valid phone number"),
-    body("studentProfile.department")
-      .optional({ checkFalsy: true })
-      .custom(hasLetters)
-      .withMessage("Department must contain letters, not just numbers"),
-    body("studentProfile.degreeOrCourse")
-      .optional({ checkFalsy: true })
-      .custom(hasLetters)
-      .withMessage("Degree/Course must contain letters, not just numbers"),
-    body("studentProfile.studyingArea")
-      .optional({ checkFalsy: true })
-      .custom(hasLetters)
-      .withMessage("Studying Area must contain letters, not just numbers"),
-    body("studentProfile.phoneNumber")
-      .optional({ checkFalsy: true })
-      .custom(isValidPhone)
-      .withMessage("Enter a valid phone number"),
-    validate,
-  ],
-  register,
-);
+// Registration cannot create a login session until the requested mobile is verified.
+router.post("/registration/phone/start", authLimiter, startRegistrationPhoneVerification);
+router.post("/registration/phone/resend", authLimiter, resendRegistrationPhoneVerification);
+router.post("/registration/phone/verify", authLimiter, verifyRegistrationPhone);
+
+// Deliberately retire the direct-create endpoint so it cannot bypass mobile verification.
+router.post("/register", (_req, res) => res.status(410).json({
+  success: false,
+  message: "Use /auth/registration/phone/start to begin registration.",
+}));
 
 /**
  * @swagger
@@ -226,6 +207,11 @@ router.put(
   ],
   updateProfile,
 );
+
+router.post("/phone/start", authMiddleware, authLimiter, startPhoneChange);
+router.post("/phone/verify", authMiddleware, authLimiter, verifyPhoneChange);
+router.post("/student-email/start", authMiddleware, authLimiter, startStudentEmailVerification);
+router.post("/student-email/verify", authMiddleware, authLimiter, verifyStudentEmail);
 
 router.put(
   "/change-password",

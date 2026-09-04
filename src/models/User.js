@@ -50,6 +50,17 @@ const User = sequelize.define(
       type: DataTypes.STRING(20),
       field: "phone_number",
     },
+    verifiedPhoneNumber: {
+      type: DataTypes.STRING(16),
+      unique: true,
+      allowNull: true,
+      field: "verified_phone_number",
+    },
+    phoneVerifiedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "phone_verified_at",
+    },
     bio: {
       type: DataTypes.TEXT,
     },

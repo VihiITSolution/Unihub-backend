@@ -92,6 +92,17 @@ const StudentProfile = sequelize.define('StudentProfile', {
     type: DataTypes.STRING(20),
     field: 'phone_number'
   },
+  studentEmail: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'student_email',
+    validate: { isEmail: true },
+  },
+  studentEmailVerifiedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'student_email_verified_at',
+  },
   // Additional Info
   dateOfBirth: {
     type: DataTypes.DATEONLY,

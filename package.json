@@ -10,8 +10,9 @@
     "migrate": "node src/migrations/migrate.js",
     "migrate:chat": "node src/migrations/create-chat-tables.js",
     "migrate:teams": "node src/migrations/20260902-teams-live-sessions.js",
+    "migrate:sms-auth": "node src/migrations/20260905-sms-authentication.js",
     "seed": "node src/migrations/seed.js",
-    "test": "node --test test/live-session-safety.test.js"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "e-learning",

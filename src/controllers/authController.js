@@ -294,7 +294,12 @@ const updateProfile = async (req, res, next) => {
     // check, so clearing the field back to empty silently no-opted).
     user.firstName = firstName;
     user.lastName = lastName;
-    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+    if (phoneNumber !== undefined && phoneNumber !== (user.phoneNumber || "")) {
+      return res.status(400).json({
+        success: false,
+        message: "Verify a new mobile number before changing it.",
+      });
+    }
     if (bio !== undefined) user.bio = bio;
     if (profileImage) user.profileImage = profileImage;
 

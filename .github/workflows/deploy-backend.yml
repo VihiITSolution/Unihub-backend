@@ -96,7 +96,29 @@ jobs:
               -e YOUTUBE_REDIRECT_URI=${{ secrets.YOUTUBE_REDIRECT_URI }} \
               -e YOUTUBE_REDIRECT_URI_LOCAL=${{ secrets.YOUTUBE_REDIRECT_URI_LOCAL }} \
               -e YOUTUBE_ACCESS_TOKEN=${{ secrets.YOUTUBE_ACCESS_TOKEN }} \
+              -e TEAMS_LIVE_ENABLED=${{ secrets.TEAMS_LIVE_ENABLED }} \
+              -e TEAMS_LIVE_WORKER_ENABLED=${{ secrets.TEAMS_LIVE_WORKER_ENABLED }} \
+              -e TEAMS_LIVE_WORKER_INTERVAL_MS=${{ secrets.TEAMS_LIVE_WORKER_INTERVAL_MS }} \
+              -e TEAMS_SESSION_BUFFER_MINUTES=${{ secrets.TEAMS_SESSION_BUFFER_MINUTES }} \
+              -e TEAMS_TENANT_ID=${{ secrets.TEAMS_TENANT_ID }} \
+              -e TEAMS_CLIENT_ID=${{ secrets.TEAMS_CLIENT_ID }} \
+              -e TEAMS_CLIENT_SECRET=${{ secrets.TEAMS_CLIENT_SECRET }} \
+              -e TEAMS_ORGANIZER_EMAIL=${{ secrets.TEAMS_ORGANIZER_EMAIL }} \
+              -e TEAMS_ORGANIZER_USER_ID=${{ secrets.TEAMS_ORGANIZER_USER_ID }} \
+              -e TEAMS_INVITE_REDIRECT_URL=${{ secrets.TEAMS_INVITE_REDIRECT_URL }} \
+              -e SMSGO_API_BASE_URL=${{ secrets.SMSGO_API_BASE_URL }} \
+              -e SMSGO_API_KEY=${{ secrets.SMSGO_API_KEY }} \
+              -e SMSGO_MASK=${{ secrets.SMSGO_MASK }} \
+              -e SMSGO_SANDBOX=${{ secrets.SMSGO_SANDBOX }} \
+              -e SMSGO_TIMEOUT_MS=${{ secrets.SMSGO_TIMEOUT_MS }} \
+              -e RESEND_API_KEY=${{ secrets.RESEND_API_KEY }} \
+              -e EMAIL_FROM="${{ secrets.EMAIL_FROM }}" \
+              -e RESEND_TIMEOUT_MS=${{ secrets.RESEND_TIMEOUT_MS }} \
+              -e AUTH_OTP_PEPPER=${{ secrets.AUTH_OTP_PEPPER }} \
               ${{ secrets.DOCKER_USERNAME }}/unihub-backend:latest
+
+            # Run the idempotent schema migration before exposing registration.
+            docker exec unihub-backend npm run migrate:sms-auth
 
             for attempt in $(seq 1 40); do
               if [ "$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' unihub-backend)" = "healthy" ]; then

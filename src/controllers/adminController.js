@@ -50,6 +50,12 @@ const getAllUsers = async (req, res, next) => {
     const { count, rows: users } = await User.findAndCountAll({
       where,
       attributes: { exclude: ["password"] },
+      include: [{
+        model: StudentProfile,
+        as: "studentProfile",
+        attributes: ["studentEmail", "studentEmailVerifiedAt"],
+        required: false,
+      }],
       limit: safeLimit,
       offset,
       order: [["createdAt", "DESC"]],
