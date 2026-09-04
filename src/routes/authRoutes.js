@@ -13,6 +13,7 @@ const {
   deleteAccount,
 } = require("../controllers/authController");
 const {
+  checkRegistrationAvailability,
   startRegistrationPhoneVerification,
   resendRegistrationPhoneVerification,
   verifyRegistrationPhone,
@@ -67,6 +68,7 @@ const router = express.Router();
  *         description: User registered successfully
  */
 // Registration cannot create a login session until the requested mobile is verified.
+router.get("/registration/availability", authLimiter, checkRegistrationAvailability);
 router.post("/registration/phone/start", authLimiter, startRegistrationPhoneVerification);
 router.post("/registration/phone/resend", authLimiter, resendRegistrationPhoneVerification);
 router.post("/registration/phone/verify", authLimiter, verifyRegistrationPhone);

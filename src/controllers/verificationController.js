@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { Op } = require("sequelize");
 const { sequelize, User, StudentProfile } = require("../models");
 const { generateToken } = require("../utils/token");
 const { normalizeSriLankanMobile } = require("../utils/phone");
@@ -37,6 +38,41 @@ async function deliverSms(challenge, code) {
   }
 }
 
+async function findExistingPhoneUser(phoneNumber) {
+  const verified = await User.findOne({ where: { verifiedPhoneNumber: phoneNumber } });
+  if (verified) return verified;
+  // Legacy accounts were grandfathered as verified before their historical
+  // free-form phone values could be canonicalised. Compare valid Sri Lankan
+  // legacy values too, so a new account cannot claim the same number.
+  const legacyUsers = await User.findAll({
+    where: { phoneNumber: { [Op.ne]: null } },
+    attributes: ["id", "phoneNumber"],
+  });
+  return legacyUsers.find((user) => normalizeSriLankanMobile(user.phoneNumber) === phoneNumber) || null;
+}
+
+const checkRegistrationAvailability = async (req, res, next) => {
+  try {
+    const data = {};
+    const email = String(req.query.email || "").trim().toLowerCase();
+    const phoneInput = String(req.query.phoneNumber || "").trim();
+    if (email) {
+      if (!/^\S+@\S+\.\S+$/.test(email)) data.email = { available: false, message: "Enter a valid email address" };
+      else data.email = (await User.findOne({ where: { email } }))
+        ? { available: false, message: "An account already exists with this email. Log in or use another email." }
+        : { available: true };
+    }
+    if (phoneInput) {
+      const phoneNumber = normalizeSriLankanMobile(phoneInput);
+      if (!phoneNumber) data.phoneNumber = { available: false, message: "Enter a valid Sri Lankan mobile number" };
+      else data.phoneNumber = (await findExistingPhoneUser(phoneNumber))
+        ? { available: false, message: "This mobile number is already in use" }
+        : { available: true };
+    }
+    res.json({ success: true, data });
+  } catch (error) { next(error); }
+};
+
 const startRegistrationPhoneVerification = async (req, res, next) => {
   try {
     const error = registrationError(req.body);
@@ -45,7 +81,7 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
     const phoneNumber = normalizeSriLankanMobile(req.body.phoneNumber);
     const [existingEmail, existingPhone] = await Promise.all([
       User.findOne({ where: { email } }),
-      User.findOne({ where: { verifiedPhoneNumber: phoneNumber } }),
+      findExistingPhoneUser(phoneNumber),
     ]);
     if (existingEmail) return res.status(400).json({ success: false, message: "Email already registered" });
     if (existingPhone) return res.status(400).json({ success: false, message: "This mobile number is already in use" });
@@ -119,7 +155,7 @@ const startPhoneChange = async (req, res, next) => {
   try {
     const phoneNumber = normalizeSriLankanMobile(req.body.phoneNumber);
     if (!phoneNumber) return res.status(400).json({ success: false, message: "Enter a valid Sri Lankan mobile number" });
-    const existing = await User.findOne({ where: { verifiedPhoneNumber: phoneNumber } });
+    const existing = await findExistingPhoneUser(phoneNumber);
     if (existing && existing.id !== req.user.id) return res.status(400).json({ success: false, message: "This mobile number is already in use" });
     const { challenge, code } = await createChallenge({ purpose: "phone_change", destination: phoneNumber, userId: req.user.id, ip: req.ip });
     await deliverSms(challenge, code);
@@ -171,4 +207,4 @@ const verifyStudentEmail = async (req, res, next) => {
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
-module.exports = { startRegistrationPhoneVerification, resendRegistrationPhoneVerification, verifyRegistrationPhone, startPhoneChange, verifyPhoneChange, startStudentEmailVerification, verifyStudentEmail };
+module.exports = { checkRegistrationAvailability, startRegistrationPhoneVerification, resendRegistrationPhoneVerification, verifyRegistrationPhone, startPhoneChange, verifyPhoneChange, startStudentEmailVerification, verifyStudentEmail };
