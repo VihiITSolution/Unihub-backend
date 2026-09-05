@@ -106,6 +106,9 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
     await deliverSms(challenge, code);
     res.status(202).json({ success: true, message: "Verification code sent", data: responseForChallenge(challenge) });
   } catch (error) {
+    if (/affiliate campaign|referral code|own referral/i.test(error.message || "")) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     if (error.code === "SMSGO_DELIVERY_FAILED") {
       return res.status(502).json({ success: false, message: error.message });
     }
