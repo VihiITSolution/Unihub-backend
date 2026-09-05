@@ -34,6 +34,7 @@ const supportRoutes = require("./routes/supportRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const socialRoutes = require("./routes/socialRoutes");
 const newsletterRoutes = require("./routes/newsletterRoutes");
+const affiliateRoutes = require("./routes/affiliateRoutes");
 
 const app = express();
 
@@ -124,6 +125,7 @@ app.use("/api/support", supportRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/affiliate", affiliateRoutes);
 
 // 404 handler - Express 5.x compatible
 app.use((req, res) => {

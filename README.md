@@ -119,6 +119,9 @@ A comprehensive Node.js/Express backend API for the UniHub E-Learning Platform w
    
    JWT_SECRET=your_jwt_secret_key
    JWT_EXPIRE=24h
+   # Required before students can save affiliate payout bank details.
+   # Use a unique, high-entropy production secret; do not reuse JWT_SECRET.
+   AFFILIATE_PAYOUT_ENCRYPTION_KEY=replace_with_a_long_random_secret
    
    CORS_ORIGIN=http://localhost:3000
    ```

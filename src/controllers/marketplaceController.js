@@ -1,6 +1,7 @@
 const { MarketplaceItem, User, VendorProfile, Order, Payment } = require('../models');
 const { Op } = require('sequelize');
 const crypto = require('crypto');
+const { recordApprovedActivity } = require("../services/affiliate.service");
 
 /**
  * Helper: Check if category requires payment
@@ -161,6 +162,7 @@ const createListing = async (req, res, next) => {
       paidAt: isPaid ? new Date() : null,
       isFreeTrialAd: freeTrial
     });
+    if (item.approvalStatus === "approved") await recordApprovedActivity(item.sellerId, "marketplace", item.id);
 
     let responseMessage;
     if (freeTrial) {

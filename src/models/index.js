@@ -36,6 +36,13 @@ const UserMeetingIdentity = require("./UserMeetingIdentity");
 const LiveSessionProviderJob = require("./LiveSessionProviderJob");
 const LiveSessionEvent = require("./LiveSessionEvent");
 const VerificationChallenge = require("./VerificationChallenge");
+const AffiliateCampaign = require("./AffiliateCampaign");
+const AffiliateAccount = require("./AffiliateAccount");
+const AffiliateReferral = require("./AffiliateReferral");
+const AffiliateRiskFlag = require("./AffiliateRiskFlag");
+const AffiliatePayoutProfile = require("./AffiliatePayoutProfile");
+const AffiliatePayoutRequest = require("./AffiliatePayoutRequest");
+const AffiliateLedgerEntry = require("./AffiliateLedgerEntry");
 
 // User - Profile relationships
 User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
@@ -237,6 +244,21 @@ SupportTicket.belongsTo(User, {
 User.hasMany(AdminAuditLog, { foreignKey: "actorAdminId", as: "adminAuditLogs" });
 AdminAuditLog.belongsTo(User, { foreignKey: "actorAdminId", as: "actorAdmin" });
 
+User.hasOne(AffiliateAccount, { foreignKey: "userId", as: "affiliateAccount" });
+AffiliateAccount.belongsTo(User, { foreignKey: "userId", as: "user" });
+AffiliateCampaign.hasMany(AffiliateReferral, { foreignKey: "campaignId", as: "referrals" });
+AffiliateReferral.belongsTo(AffiliateCampaign, { foreignKey: "campaignId", as: "campaign" });
+AffiliateReferral.belongsTo(User, { foreignKey: "referrerUserId", as: "referrer" });
+AffiliateReferral.belongsTo(User, { foreignKey: "referredUserId", as: "referred" });
+AffiliateReferral.hasMany(AffiliateRiskFlag, { foreignKey: "referralId", as: "riskFlags" });
+AffiliateRiskFlag.belongsTo(AffiliateReferral, { foreignKey: "referralId", as: "referral" });
+User.hasOne(AffiliatePayoutProfile, { foreignKey: "userId", as: "affiliatePayoutProfile" });
+AffiliatePayoutProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
+User.hasMany(AffiliatePayoutRequest, { foreignKey: "userId", as: "affiliatePayoutRequests" });
+AffiliatePayoutRequest.belongsTo(User, { foreignKey: "userId", as: "user" });
+AffiliatePayoutRequest.hasMany(AffiliateRiskFlag, { foreignKey: "payoutRequestId", as: "riskFlags" });
+AffiliateRiskFlag.belongsTo(AffiliatePayoutRequest, { foreignKey: "payoutRequestId", as: "payoutRequest" });
+
 // Notification relationships
 User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
 Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
@@ -373,4 +395,11 @@ module.exports = {
   YouTubeRightsDeclaration,
   AdminAuditLog,
   VerificationChallenge,
+  AffiliateCampaign,
+  AffiliateAccount,
+  AffiliateReferral,
+  AffiliateRiskFlag,
+  AffiliatePayoutProfile,
+  AffiliatePayoutRequest,
+  AffiliateLedgerEntry,
 };

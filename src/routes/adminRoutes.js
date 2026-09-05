@@ -43,8 +43,16 @@ const {
 } = require("../controllers/adminOperationsController");
 const adminLiveSessions = require("../controllers/adminLiveSessionController");
 const liveSessionController = require("../controllers/liveSessionController");
+const affiliateAdmin = require("../controllers/adminAffiliateController");
 
 const router = express.Router();
+
+router.get("/affiliate/referrals", authMiddleware, authorize("admin"), affiliateAdmin.listReferrals);
+router.post("/affiliate/referrals/:id/review", authMiddleware, authorize("admin"), auditAdminAction("affiliate.referral_reviewed", "affiliate_referral", "Reviewed an affiliate referral"), affiliateAdmin.reviewReferral);
+router.get("/affiliate/payouts", authMiddleware, authorize("admin"), affiliateAdmin.listPayouts);
+router.get("/affiliate/payouts/:id", authMiddleware, authorize("admin"), affiliateAdmin.payoutDetail);
+router.post("/affiliate/payouts/:id/review", authMiddleware, authorize("admin"), auditAdminAction("affiliate.payout_reviewed", "affiliate_payout", "Reviewed an affiliate payout"), affiliateAdmin.reviewPayout);
+router.post("/affiliate/payouts/:id/paid", authMiddleware, authorize("admin"), auditAdminAction("affiliate.payout_paid", "affiliate_payout", "Marked an affiliate payout paid"), affiliateAdmin.markPayoutPaid);
 
 router.get("/live-sessions", authMiddleware, authorize("admin"), adminLiveSessions.list);
 router.get("/live-sessions/calendar", authMiddleware, authorize("admin"), adminLiveSessions.calendar);

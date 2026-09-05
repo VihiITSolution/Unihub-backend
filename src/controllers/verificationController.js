@@ -6,6 +6,7 @@ const { normalizeSriLankanMobile } = require("../utils/phone");
 const { sendVerificationSms } = require("../services/smsgo.service");
 const { sendStudentEmailVerification } = require("../services/resend.service");
 const { createChallenge, resendChallenge, consumeVerifiedChallenge, encryptRegistrationPayload, decryptRegistrationPayload } = require("../services/verification.service");
+const { validateReferralCode, createReferralAttribution, ensureAffiliateAccount } = require("../services/affiliate.service");
 
 const responseForChallenge = (challenge) => ({
   challengeId: challenge.id,
@@ -85,6 +86,7 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
     ]);
     if (existingEmail) return res.status(400).json({ success: false, message: "Email already registered" });
     if (existingPhone) return res.status(400).json({ success: false, message: "This mobile number is already in use" });
+    if (req.body.referralCode) await validateReferralCode(req.body.referralCode);
 
     const registrationPayload = {
       firstName: req.body.firstName.trim(), lastName: req.body.lastName.trim(), email,
@@ -93,6 +95,7 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
       primaryRole: ["student", "tutor", "vendor"].includes(req.body.primaryRole) ? req.body.primaryRole : "student",
       studentProfile: req.body.studentProfile || null,
       studentEmail: req.body.studentEmail ? req.body.studentEmail.trim().toLowerCase() : null,
+      referralCode: req.body.referralCode ? String(req.body.referralCode).trim().toUpperCase() : null,
     };
     if (!registrationPayload.roles.length) registrationPayload.roles = ["student"];
     if (!registrationPayload.roles.includes(registrationPayload.primaryRole)) registrationPayload.primaryRole = registrationPayload.roles[0];
@@ -144,6 +147,8 @@ const verifyRegistrationPhone = async (req, res, next) => {
         user.isStudentProfileComplete = true;
         await user.save({ transaction });
       }
+      await ensureAffiliateAccount(user.id, transaction);
+      await createReferralAttribution({ referralCode: pending.referralCode, referredUserId: user.id, transaction });
     });
     const userWithProfile = await User.findByPk(user.id, { include: [{ model: StudentProfile, as: "studentProfile" }] });
     res.status(201).json({ success: true, message: "Mobile verified and account created", data: { user: userWithProfile, token: generateToken(user.id) } });

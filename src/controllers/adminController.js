@@ -16,6 +16,7 @@ const BoardingPlace = require("../models/BoardingPlace");
 const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
 const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
+const { recordApprovedActivity } = require("../services/affiliate.service");
 
 /**
  * Get all users (Admin only)
@@ -558,6 +559,7 @@ const approveCourse = async (req, res, next) => {
     course.rejectionReason = null;
 
     await course.save();
+    await recordApprovedActivity(course.tutorId, "course", course.id);
 
     res.status(200).json({
       success: true,
@@ -708,6 +710,7 @@ const approveMarketplaceItem = async (req, res, next) => {
     }
 
     await item.save();
+    await recordApprovedActivity(item.sellerId, "marketplace", item.id);
 
     res.status(200).json({
       success: true,

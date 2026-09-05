@@ -10,6 +10,8 @@ const runSocialMigrations = require("./migrations/social-tables");
 const createYouTubeRightsDeclarations = require("./migrations/create-youtube-rights-declarations");
 const createAdminOperations = require("./migrations/create-admin-operations");
 const createCourseNotifyRequests = require("./migrations/create-course-notify-requests");
+const createAffiliateProgram = require("./migrations/create-affiliate-program");
+const { seedEligibleAffiliateAccounts } = require("./services/affiliate.service");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
 const { deleteExpiredChallenges } = require("./services/verification.service");
 
@@ -201,6 +203,8 @@ const startServer = async () => {
     await createYouTubeRightsDeclarations();
     await createAdminOperations();
     await createCourseNotifyRequests();
+    await createAffiliateProgram(sequelize);
+    await seedEligibleAffiliateAccounts();
 
     // Wrap Express in a plain HTTP server so Socket.io can attach to it -
     // Express alone can't handle the WebSocket upgrade handshake.
