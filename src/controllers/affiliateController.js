@@ -12,7 +12,8 @@ async function getAffiliateMe(req, res, next) {
       campaign ? AffiliatePayoutRequest.findAll({ where: { userId: req.user.id, campaignId: campaign.id }, attributes: ["id", "amount", "status", "accountMask", "createdAt", "reviewedAt", "paidAt", "rejectionReason"], order: [["createdAt", "DESC"]] }) : [],
       campaign ? balances(req.user.id, campaign.id) : { available: 0, reserved: 0, paid: 0 },
     ]);
-    res.json({ success: true, data: { account: { referralCode: account.referralCode, referralLink: `${process.env.CORE_APP_URL || "http://localhost:3001"}/auth/register?ref=${account.referralCode}` }, campaign, balances: totals, payoutProfile: profile ? { accountMask: profile.accountMask } : null, referrals, payouts } });
+    const coreAppUrl = (process.env.CORE_APP_URL || "https://unihub.lk").replace(/\/+$/, "");
+    res.json({ success: true, data: { account: { referralCode: account.referralCode, referralLink: `${coreAppUrl}/auth/register?ref=${account.referralCode}` }, campaign, balances: totals, payoutProfile: profile ? { accountMask: profile.accountMask } : null, referrals, payouts } });
   } catch (error) { next(error); }
 }
 

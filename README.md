@@ -122,6 +122,8 @@ A comprehensive Node.js/Express backend API for the UniHub E-Learning Platform w
    # Required before students can save affiliate payout bank details.
    # Use a unique, high-entropy production secret; do not reuse JWT_SECRET.
    AFFILIATE_PAYOUT_ENCRYPTION_KEY=replace_with_a_long_random_secret
+   # Public URL used in referral links. No trailing slash.
+   CORE_APP_URL=https://unihub.lk
    
    CORS_ORIGIN=http://localhost:3000
    ```
