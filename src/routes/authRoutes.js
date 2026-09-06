@@ -3,6 +3,7 @@ const { body } = require("express-validator");
 const {
   register,
   login,
+  logout,
   forgotPassword,
   resetPassword,
   getProfile,
@@ -78,6 +79,8 @@ router.post("/register", (_req, res) => res.status(410).json({
   success: false,
   message: "Use /auth/registration/phone/start to begin registration.",
 }));
+
+router.post("/logout", authMiddleware, logout);
 
 /**
  * @swagger

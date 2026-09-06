@@ -175,6 +175,17 @@ const login = async (req, res, next) => {
   }
 };
 
+// JWT authentication is stateless, so there is no server-side session to
+// destroy. This endpoint gives the client a successful, authenticated logout
+// response before it clears its locally stored token and profile.
+const logout = async (_req, res, next) => {
+  try {
+    res.status(200).json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * Request a password reset. Always returns the same generic message whether
  * or not the email is registered, so this endpoint can't be used to probe
@@ -458,6 +469,7 @@ const deleteAccount = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  logout,
   forgotPassword,
   resetPassword,
   getProfile,
