@@ -29,7 +29,18 @@ function accountHash(accountNumber) {
 function accountMask(value) { const plain = String(value || ""); return `${"•".repeat(Math.max(0, plain.length - 4))}${plain.slice(-4)}`; }
 function isEligible(user) {
   const roles = Array.isArray(user.roles) ? user.roles : [];
-  return !!(user.isActive && roles.includes("student") && user.verifiedPhoneNumber && (user.isStudentProfileComplete || user.studentProfile?.isProfileComplete));
+  // Older accounts completed SMS verification before `verifiedPhoneNumber`
+  // was introduced. For those users `phoneVerifiedAt` plus their saved number
+  // is the equally valid, durable proof of mobile verification.
+  const hasVerifiedMobile = Boolean(
+    user.verifiedPhoneNumber || (user.phoneVerifiedAt && user.phoneNumber),
+  );
+  return !!(
+    user.isActive
+    && roles.includes("student")
+    && hasVerifiedMobile
+    && (user.isStudentProfileComplete || user.studentProfile?.isProfileComplete)
+  );
 }
 async function activeCampaign({ signupOnly = false, transaction } = {}) {
   const now = new Date();
@@ -51,7 +62,17 @@ async function ensureAffiliateAccount(userId, transaction) {
   throw new Error("Unable to create referral code");
 }
 async function seedEligibleAffiliateAccounts() {
-  const users = await User.findAll({ where: { isActive: true, isStudentProfileComplete: true, verifiedPhoneNumber: { [Op.ne]: null } }, attributes: ["id", "roles", "isActive", "verifiedPhoneNumber", "isStudentProfileComplete"] });
+  const users = await User.findAll({
+    where: {
+      isActive: true,
+      [Op.or]: [
+        { verifiedPhoneNumber: { [Op.ne]: null } },
+        { phoneVerifiedAt: { [Op.ne]: null } },
+      ],
+    },
+    attributes: ["id", "roles", "isActive", "phoneNumber", "verifiedPhoneNumber", "phoneVerifiedAt", "isStudentProfileComplete"],
+    include: [{ model: StudentProfile, as: "studentProfile", attributes: ["isProfileComplete"] }],
+  });
   for (const user of users) if (isEligible(user)) await ensureAffiliateAccount(user.id);
 }
 async function validateReferralCode(referralCode, transaction) {
