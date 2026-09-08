@@ -5,6 +5,7 @@ const {
   YouTubeRightsDeclaration,
 } = require("../models");
 const youtubeUploader = require("../config/youtube");
+const { recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const path = require("path");
 const fs = require("fs");
 
@@ -219,6 +220,7 @@ const addCourseContent = async (req, res, next) => {
       order: order || 0,
       isPreview: isPreview === "true" || isPreview === true ? true : false,
     });
+    await recordQualifyingVideoActivity(course, content);
 
     res.status(201).json({
       success: true,
@@ -413,6 +415,7 @@ const updateCourseContent = async (req, res, next) => {
     }
 
     await content.save();
+    await recordQualifyingVideoActivity(course, content);
 
     res.status(200).json({
       success: true,

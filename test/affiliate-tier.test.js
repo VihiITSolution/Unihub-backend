@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { CAMPAIGN_TIERS, isEligible } = require("../src/services/affiliate.service");
+const { CAMPAIGN_TIERS, isEligible, isQualifyingVideoActivity } = require("../src/services/affiliate.service");
 
 function reward(sequence) {
   return CAMPAIGN_TIERS.find((tier) => tier.through === null || sequence <= tier.through).amount;
@@ -28,4 +28,12 @@ test("affiliate eligibility accepts legacy SMS verification while requiring an a
   assert.equal(isEligible(legacyVerifiedStudent), true);
   assert.equal(isEligible({ ...legacyVerifiedStudent, phoneNumber: null }), false);
   assert.equal(isEligible({ ...legacyVerifiedStudent, isStudentProfileComplete: false }), false);
+});
+
+test("only an approved course video strictly longer than 20 minutes qualifies", () => {
+  const course = { approvalStatus: "approved", isPublished: true };
+  assert.equal(isQualifyingVideoActivity(course, { type: "video", duration: 20 }), false);
+  assert.equal(isQualifyingVideoActivity(course, { type: "video", duration: 21 }), true);
+  assert.equal(isQualifyingVideoActivity({ ...course, isPublished: false }, { type: "video", duration: 30 }), false);
+  assert.equal(isQualifyingVideoActivity(course, { type: "pdf", duration: 30 }), false);
 });

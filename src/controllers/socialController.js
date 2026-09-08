@@ -1,6 +1,5 @@
 const { Op } = require("sequelize");
 const { Post, PostLike, PostComment, Follow, User, Notification } = require("../models");
-const { evaluateSocialActivity } = require("../services/affiliate.service");
 
 const AUTHOR_ATTRS = ["id", "firstName", "lastName", "profileImage", "primaryRole"];
 
@@ -75,8 +74,6 @@ const createPost = async (req, res, next) => {
     const created = await Post.findByPk(post.id, {
       include: [{ association: "author", attributes: AUTHOR_ATTRS }],
     });
-    await evaluateSocialActivity(req.user.id);
-
     res.status(201).json({ success: true, data: { post: { ...created.toJSON(), likedByMe: false } } });
   } catch (error) {
     next(error);
@@ -242,7 +239,6 @@ const addComment = async (req, res, next) => {
     const created = await PostComment.findByPk(comment.id, {
       include: [{ association: "author", attributes: AUTHOR_ATTRS }],
     });
-    await evaluateSocialActivity(req.user.id);
     res.status(201).json({ success: true, data: { comment: created } });
   } catch (error) {
     next(error);

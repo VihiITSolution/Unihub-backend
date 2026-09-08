@@ -8,7 +8,7 @@ module.exports = sequelize.define("AffiliateReferral", {
   referredUserId: { type: DataTypes.INTEGER, allowNull: false, unique: true, field: "referred_user_id" },
   referralCode: { type: DataTypes.STRING(32), allowNull: false, field: "referral_code" },
   status: { type: DataTypes.ENUM("registered", "activity_detected", "review", "available", "held", "rejected", "reversed"), allowNull: false, defaultValue: "registered" },
-  activityType: { type: DataTypes.ENUM("course", "marketplace", "social"), allowNull: true, field: "activity_type" },
+  activityType: { type: DataTypes.ENUM("course", "marketplace", "boarding", "video", "social"), allowNull: true, field: "activity_type" },
   activityResourceId: { type: DataTypes.INTEGER, allowNull: true, field: "activity_resource_id" },
   socialPostId: { type: DataTypes.INTEGER, allowNull: true, field: "social_post_id" },
   socialCommentId: { type: DataTypes.INTEGER, allowNull: true, field: "social_comment_id" },

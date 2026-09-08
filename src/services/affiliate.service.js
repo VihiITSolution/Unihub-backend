@@ -7,6 +7,7 @@ const {
 } = require("../models");
 
 const CAMPAIGN_TIERS = [{ through: 20, amount: 20 }, { through: 100, amount: 30 }, { through: null, amount: 40 }];
+const MINIMUM_QUALIFYING_VIDEO_MINUTES = 20;
 
 function payoutSecret() {
   if (!process.env.AFFILIATE_PAYOUT_ENCRYPTION_KEY) throw new Error("Affiliate payouts are not configured");
@@ -135,6 +136,20 @@ async function recordApprovedActivity(userId, activityType, activityResourceId) 
     return approveReferral(referral.id, null, transaction);
   });
 }
+function isQualifyingVideoActivity(course, content) {
+  return Boolean(
+    course
+    && content
+    && course.approvalStatus === "approved"
+    && course.isPublished
+    && content.type === "video"
+    && Number(content.duration) > MINIMUM_QUALIFYING_VIDEO_MINUTES,
+  );
+}
+async function recordQualifyingVideoActivity(course, content) {
+  if (!isQualifyingVideoActivity(course, content)) return null;
+  return recordApprovedActivity(course.tutorId, "video", content.id);
+}
 async function evaluateSocialActivity(userId) {
   return sequelize.transaction(async (transaction) => {
     const referral = await AffiliateReferral.findOne({ where: { referredUserId: userId, status: "registered" }, transaction, lock: transaction.LOCK.UPDATE });
@@ -179,4 +194,4 @@ async function createPayoutRequest(userId, amount) {
     return request;
   });
 }
-module.exports = { CAMPAIGN_TIERS, encryptDetails, decryptDetails, accountMask, isEligible, activeCampaign, ensureAffiliateAccount, seedEligibleAffiliateAccounts, validateReferralCode, createReferralAttribution, recordApprovedActivity, evaluateSocialActivity, approveReferral, balances, savePayoutProfile, createPayoutRequest };
+module.exports = { CAMPAIGN_TIERS, MINIMUM_QUALIFYING_VIDEO_MINUTES, encryptDetails, decryptDetails, accountMask, isEligible, activeCampaign, ensureAffiliateAccount, seedEligibleAffiliateAccounts, validateReferralCode, createReferralAttribution, recordApprovedActivity, isQualifyingVideoActivity, recordQualifyingVideoActivity, evaluateSocialActivity, approveReferral, balances, savePayoutProfile, createPayoutRequest };

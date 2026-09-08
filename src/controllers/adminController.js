@@ -16,7 +16,7 @@ const BoardingPlace = require("../models/BoardingPlace");
 const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
 const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
-const { recordApprovedActivity } = require("../services/affiliate.service");
+const { recordApprovedActivity, recordQualifyingVideoActivity } = require("../services/affiliate.service");
 
 /**
  * Get all users (Admin only)
@@ -559,7 +559,11 @@ const approveCourse = async (req, res, next) => {
     course.rejectionReason = null;
 
     await course.save();
-    await recordApprovedActivity(course.tutorId, "course", course.id);
+    const qualifyingVideo = await CourseContent.findOne({
+      where: { courseId: course.id, type: "video", duration: { [Op.gt]: 20 } },
+      order: [["createdAt", "ASC"]],
+    });
+    await recordQualifyingVideoActivity(course, qualifyingVideo);
 
     res.status(200).json({
       success: true,
@@ -1230,6 +1234,7 @@ const approveBoardingPlace = async (req, res, next) => {
     }
 
     await place.save();
+    await recordApprovedActivity(place.vendorId, "boarding", place.id);
 
     res.status(200).json({ success: true, message: "Boarding place approved successfully", data: { place } });
   } catch (error) {
