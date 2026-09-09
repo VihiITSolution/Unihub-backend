@@ -2,6 +2,7 @@ const { MarketplaceItem, User, VendorProfile, Order, Payment } = require('../mod
 const { Op } = require('sequelize');
 const crypto = require('crypto');
 const { recordApprovedActivity } = require("../services/affiliate.service");
+const { notifyActiveAdmins } = require("./notificationController");
 
 /**
  * Helper: Check if category requires payment
@@ -163,6 +164,14 @@ const createListing = async (req, res, next) => {
       isFreeTrialAd: freeTrial
     });
     if (item.approvalStatus === "approved") await recordApprovedActivity(item.sellerId, "marketplace", item.id);
+    if (item.approvalStatus === "pending" && item.isPaid) {
+      notifyActiveAdmins(
+        "Marketplace listing awaiting review",
+        `“${item.title}” has been submitted for marketplace moderation.`,
+        "/marketplace",
+        { marketplaceItemId: item.id, sellerId: item.sellerId },
+      ).catch((notificationError) => console.error("Failed to notify admins about marketplace listing:", notificationError.message));
+    }
 
     let responseMessage;
     if (freeTrial) {

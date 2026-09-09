@@ -180,6 +180,26 @@ const createNotification = async (
   }
 };
 
+/**
+ * Notify every active administrator about a new item in an operational queue.
+ * This is deliberately best-effort; an unread-notification failure must never
+ * prevent a student or vendor from completing their request.
+ */
+const notifyActiveAdmins = async (title, message, link = null, metadata = null) => {
+  const users = await User.findAll({
+    where: { isActive: true },
+    attributes: ["id", "roles", "primaryRole"],
+  });
+  const adminIds = users
+    .filter((user) => user.primaryRole === "admin" || user.roles?.includes("admin"))
+    .map((user) => user.id);
+
+  await Promise.allSettled(
+    adminIds.map((userId) => createNotification(userId, "general", title, message, link, metadata)),
+  );
+  return adminIds.length;
+};
+
 module.exports = {
   getUserNotifications,
   getUnreadCount,
@@ -187,4 +207,5 @@ module.exports = {
   markAllAsRead,
   deleteNotification,
   createNotification,
+  notifyActiveAdmins,
 };

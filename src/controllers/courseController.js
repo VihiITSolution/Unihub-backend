@@ -12,6 +12,7 @@ const {
   Review,
 } = require("../models");
 const { Op } = require("sequelize");
+const { notifyActiveAdmins } = require("./notificationController");
 
 /**
  * Create a new course (Tutor only)
@@ -513,6 +514,13 @@ const submitForReview = async (req, res, next) => {
     course.rejectionReason = null; // Clear previous rejection reason
 
     await course.save();
+
+    notifyActiveAdmins(
+      "Course awaiting review",
+      `“${course.title}” has been submitted for course moderation.`,
+      "/courses/pending",
+      { courseId: course.id, tutorId: course.tutorId },
+    ).catch((notificationError) => console.error("Failed to notify admins about course review:", notificationError.message));
 
     res.status(200).json({
       success: true,

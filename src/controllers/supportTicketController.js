@@ -1,4 +1,5 @@
 const { SupportTicket } = require("../models");
+const { notifyActiveAdmins } = require("./notificationController");
 
 const createTicket = async (req, res, next) => {
   try {
@@ -13,6 +14,13 @@ const createTicket = async (req, res, next) => {
       description,
       attachments,
     });
+
+    notifyActiveAdmins(
+      `New ${ticket.priority} support ticket`,
+      ticket.subject,
+      "/support",
+      { supportTicketId: ticket.id, priority: ticket.priority, category: ticket.category },
+    ).catch((notificationError) => console.error("Failed to notify admins about support ticket:", notificationError.message));
 
     res.status(201).json({
       success: true,

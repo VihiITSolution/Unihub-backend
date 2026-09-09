@@ -3,6 +3,7 @@ const User = require('../models/User');
 const VendorProfile = require('../models/VendorProfile');
 const { Op } = require('sequelize');
 const { isFreeTrialActive, calculateFreeTrialExpirationDate } = require('./marketplaceController');
+const { notifyActiveAdmins } = require("./notificationController");
 
 // @desc    Upload images for a boarding place listing
 // @route   POST /api/boarding/upload-images
@@ -121,6 +122,15 @@ exports.createBoardingPlace = async (req, res) => {
       approvalStatus: 'pending',
       expiresAt: null // set on admin approval
     });
+
+    if (boardingPlace.isPaid) {
+      notifyActiveAdmins(
+        "Boarding listing awaiting review",
+        `“${boardingPlace.title}” has been submitted for boarding moderation.`,
+        "/boarding",
+        { boardingPlaceId: boardingPlace.id, vendorId: boardingPlace.vendorId },
+      ).catch((notificationError) => console.error("Failed to notify admins about boarding listing:", notificationError.message));
+    }
 
     res.status(201).json({
       success: true,

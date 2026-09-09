@@ -1,5 +1,5 @@
 const { User, StudentProfile, TutorProfile } = require("../models");
-const { createNotification } = require("./notificationController");
+const { createNotification, notifyActiveAdmins } = require("./notificationController");
 
 /**
  * Get student profile for current user
@@ -169,6 +169,13 @@ const applyAsTutor = async (req, res, next) => {
       approvalStatus: "pending",
       isProfileComplete: true,
     });
+
+    notifyActiveAdmins(
+      "Tutor application awaiting review",
+      "A new tutor application has been submitted and is ready for review.",
+      "/tutors/pending",
+      { tutorProfileId: profile.id, applicantUserId: req.user.id },
+    ).catch((notificationError) => console.error("Failed to notify admins about tutor application:", notificationError.message));
 
     res.status(201).json({
       success: true,
