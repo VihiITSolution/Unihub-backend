@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getAllUsers,
+  getUserDetails,
   updateUserStatus,
   deleteUser,
   getStatistics,
@@ -102,6 +103,7 @@ router.delete("/live-sessions/:id/recording", authMiddleware, authorize("admin")
  *         description: List of users
  */
 router.get("/users", authMiddleware, authorize("admin"), getAllUsers);
+router.get("/users/:id", authMiddleware, authorize("admin"), getUserDetails);
 
 /**
  * @swagger

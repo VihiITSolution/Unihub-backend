@@ -10,6 +10,10 @@ const {
   StudentProfile,
   YouTubeRightsDeclaration,
   SupportTicket,
+  AffiliateAccount,
+  AffiliateReferral,
+  AffiliatePayoutRequest,
+  AffiliateLedgerEntry,
 } = require("../models");
 const Faculty = require("../models/Faculty");
 const BoardingPlace = require("../models/BoardingPlace");
@@ -71,6 +75,183 @@ const getAllUsers = async (req, res, next) => {
           page: safePage,
           limit: safeLimit,
           totalPages: Math.ceil(count / safeLimit),
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get a user and a concise record of their UniHub activity (Admin only).
+ * Payout requests intentionally expose only the existing account mask; encrypted
+ * bank snapshots must never be returned from this general user-inspection API.
+ */
+const getUserDetails = async (req, res, next) => {
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId < 1) {
+      return res.status(400).json({ success: false, message: "Invalid user ID." });
+    }
+
+    const user = await User.findByPk(userId, {
+      attributes: [
+        "id", "firstName", "lastName", "email", "roles", "primaryRole",
+        "phoneNumber", "verifiedPhoneNumber", "phoneVerifiedAt", "bio", "profileImage",
+        "isVerified", "isActive", "isStudentProfileComplete", "isTutorProfileComplete",
+        "isVendorProfileComplete", "lastLogin", "createdAt", "updatedAt",
+      ],
+      include: [
+        {
+          model: StudentProfile,
+          as: "studentProfile",
+          attributes: [
+            "universityName", "customUniversity", "department", "customDepartment",
+            "degreeOrCourse", "studyingArea", "currentYear", "currentSemester",
+            "studentEmail", "studentEmailVerifiedAt", "isProfileComplete",
+          ],
+          required: false,
+        },
+        {
+          model: TutorProfile,
+          as: "tutorProfile",
+          attributes: [
+            "qualifications", "graduationStatus", "expertiseAreas", "coursesSubjects",
+            "yearsOfExperience", "approvalStatus", "isApproved", "isProfileComplete",
+            "totalCourses", "totalStudents", "averageRating",
+          ],
+          required: false,
+        },
+      ],
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    const publicUserAttributes = ["id", "firstName", "lastName", "email", "profileImage"];
+    const [
+      courses,
+      videoLessons,
+      marketplaceListings,
+      boardingListings,
+      enrollments,
+      affiliateAccount,
+      referralsMade,
+      referredBy,
+      payoutRequests,
+      ledgerEntries,
+      courseCount,
+      marketplaceCount,
+      boardingCount,
+      enrollmentCount,
+      referralCount,
+    ] = await Promise.all([
+      Course.findAll({
+        where: { tutorId: userId },
+        attributes: ["id", "title", "approvalStatus", "isPublished", "createdAt", "updatedAt"],
+        order: [["createdAt", "DESC"]],
+        limit: 25,
+      }),
+      CourseContent.findAll({
+        where: { type: "video" },
+        attributes: ["id", "courseId", "title", "duration", "isPublished", "createdAt"],
+        include: [{
+          model: Course,
+          as: "course",
+          required: true,
+          where: { tutorId: userId },
+          attributes: ["id", "title", "approvalStatus", "isPublished"],
+        }],
+        order: [["createdAt", "DESC"]],
+        limit: 25,
+      }),
+      MarketplaceItem.findAll({
+        where: { sellerId: userId },
+        attributes: ["id", "title", "category", "price", "isAvailable", "approvalStatus", "createdAt", "approvedAt"],
+        order: [["createdAt", "DESC"]],
+        limit: 25,
+      }),
+      BoardingPlace.findAll({
+        where: { vendorId: userId },
+        attributes: ["id", "title", "city", "monthlyRent", "isActive", "approvalStatus", "createdAt"],
+        order: [["createdAt", "DESC"]],
+        limit: 25,
+      }),
+      Enrollment.findAll({
+        where: { learnerId: userId },
+        attributes: ["id", "status", "progress", "enrolledAt", "completedAt"],
+        include: [{ model: Course, as: "course", attributes: ["id", "title", "approvalStatus", "isPublished"] }],
+        order: [["enrolledAt", "DESC"]],
+        limit: 25,
+      }),
+      AffiliateAccount.findOne({
+        where: { userId },
+        attributes: ["referralCode", "isActive", "createdAt"],
+      }),
+      AffiliateReferral.findAll({
+        where: { referrerUserId: userId },
+        attributes: [
+          "id", "referredUserId", "status", "activityType", "activityResourceId",
+          "tierSequence", "rewardAmount", "activityAt", "approvedAt", "createdAt",
+        ],
+        include: [{ model: User, as: "referred", attributes: publicUserAttributes, required: false }],
+        order: [["createdAt", "DESC"]],
+        limit: 25,
+      }),
+      AffiliateReferral.findOne({
+        where: { referredUserId: userId },
+        attributes: ["id", "status", "activityType", "rewardAmount", "createdAt"],
+        include: [{ model: User, as: "referrer", attributes: publicUserAttributes, required: false }],
+      }),
+      AffiliatePayoutRequest.findAll({
+        where: { userId },
+        attributes: [
+          "id", "amount", "status", "accountMask", "reviewedAt", "paidAt",
+          "transferReference", "rejectionReason", "createdAt",
+        ],
+        order: [["createdAt", "DESC"]],
+        limit: 25,
+      }),
+      AffiliateLedgerEntry.findAll({
+        where: { userId },
+        attributes: ["id", "type", "amount", "referralId", "payoutRequestId", "createdAt"],
+        order: [["createdAt", "DESC"]],
+        limit: 30,
+      }),
+      Course.count({ where: { tutorId: userId } }),
+      MarketplaceItem.count({ where: { sellerId: userId } }),
+      BoardingPlace.count({ where: { vendorId: userId } }),
+      Enrollment.count({ where: { learnerId: userId } }),
+      AffiliateReferral.count({ where: { referrerUserId: userId } }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user,
+        activities: {
+          summary: {
+            courses: courseCount,
+            videos: videoLessons.length,
+            marketplaceListings: marketplaceCount,
+            boardingListings: boardingCount,
+            enrollments: enrollmentCount,
+            referralsMade: referralCount,
+          },
+          courses,
+          videoLessons,
+          marketplaceListings,
+          boardingListings,
+          enrollments,
+          affiliate: {
+            account: affiliateAccount,
+            referralsMade,
+            referredBy,
+            payoutRequests,
+            ledgerEntries,
+          },
         },
       },
     });
@@ -1306,6 +1487,7 @@ const getSuggestions = async (req, res, next) => {
 
 module.exports = {
   getAllUsers,
+  getUserDetails,
   updateUserStatus,
   deleteUser,
   getStatistics,
