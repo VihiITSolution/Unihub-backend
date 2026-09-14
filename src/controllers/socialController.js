@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Post, PostLike, PostComment, Follow, User, Notification } = require("../models");
+const { Post, PostLike, PostComment, Follow, User, Notification, StudentProfile } = require("../models");
 
 const AUTHOR_ATTRS = ["id", "firstName", "lastName", "profileImage", "primaryRole"];
 
@@ -286,9 +286,16 @@ const getPublicProfile = async (req, res, next) => {
     const targetUserId = parseInt(req.params.userId, 10);
     const user = await User.findOne({
       where: { id: targetUserId, isActive: true },
-      attributes: ["id", "firstName", "lastName", "bio", "profileImage", "primaryRole"],
+      attributes: ["id", "firstName", "lastName", "bio", "profileImage", "primaryRole", "roles"],
+      include: [{ model: StudentProfile, as: "studentProfile", attributes: ["studentEmailVerifiedAt"], required: false }],
     });
     if (!user) return res.status(404).json({ success: false, message: "User not found." });
+
+    const publicUser = user.toJSON();
+    const isStudent = publicUser.primaryRole === "student" || publicUser.roles?.includes("student");
+    publicUser.isStudentEmailVerified = isStudent && Boolean(publicUser.studentProfile?.studentEmailVerifiedAt);
+    delete publicUser.roles;
+    delete publicUser.studentProfile;
 
     const isOwnProfile = req.user?.id === targetUserId;
     const allowedVisibilities = await visibleVisibilitiesFor(req.user?.id, targetUserId);
@@ -305,7 +312,7 @@ const getPublicProfile = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        user,
+        user: publicUser,
         counts: { posts: postCount, followers: followerCount, following: followingCount },
         isOwnProfile,
         isFollowing: !!isFollowing,
