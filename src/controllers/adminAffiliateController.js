@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { sequelize, AffiliateReferral, AffiliateRiskFlag, AffiliatePayoutRequest, AffiliateLedgerEntry, User, StudentProfile } = require("../models");
+const { sequelize, AffiliateReferral, AffiliateRiskFlag, AffiliatePayoutRequest, AffiliateLedgerEntry, User, StudentProfile, VendorProfile } = require("../models");
 const { approveReferral, decryptDetails } = require("../services/affiliate.service");
 
 const pageValues = (query) => ({ page: Math.max(Number(query.page) || 1, 1), limit: Math.min(Math.max(Number(query.limit) || 20, 1), 100) });
@@ -9,7 +9,13 @@ async function listReferrals(req, res, next) {
     if (req.query.status) where.status = req.query.status;
     if (req.query.referrerId) where.referrerUserId = Number(req.query.referrerId);
     if (req.query.from || req.query.to) where.createdAt = { ...(req.query.from ? { [Op.gte]: new Date(req.query.from) } : {}), ...(req.query.to ? { [Op.lte]: new Date(req.query.to) } : {}) };
-    const referredInclude = { model: User, as: "referred", attributes: ["id", "firstName", "lastName", "email"], include: [{ model: StudentProfile, as: "studentProfile", attributes: ["universityName", "department"] }] };
+    const referredInclude = {
+      model: User, as: "referred", attributes: ["id", "firstName", "lastName", "email"],
+      include: [
+        { model: StudentProfile, as: "studentProfile", attributes: ["universityName", "department"] },
+        { model: VendorProfile, as: "vendorProfile", attributes: ["shopName", "businessType", "approvalStatus"] },
+      ]
+    };
     if (req.query.university) referredInclude.include[0].where = { universityName: req.query.university };
     const { count, rows } = await AffiliateReferral.findAndCountAll({ where, include: [{ model: User, as: "referrer", attributes: ["id", "firstName", "lastName", "email"] }, referredInclude, { association: "riskFlags" }], order: [["createdAt", "DESC"]], limit, offset: (page - 1) * limit, distinct: true });
     res.json({ success: true, data: { referrals: rows, pagination: { total: count, page, limit, totalPages: Math.ceil(count / limit) } } });

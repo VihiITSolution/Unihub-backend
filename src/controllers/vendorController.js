@@ -1,4 +1,5 @@
 const { VendorProfile, User } = require('../models');
+const { ensureAffiliateAccount, recordApprovedActivity } = require('../services/affiliate.service');
 
 /**
  * Create vendor profile
@@ -46,7 +47,7 @@ const createVendorProfile = async (req, res, next) => {
       isApproved: true
     });
 
-    // Update user's vendor profile completion status
+    // Update user's vendor profile completion status and add vendor role
     await User.update(
       { 
         isVendorProfileComplete: true,
@@ -54,6 +55,18 @@ const createVendorProfile = async (req, res, next) => {
       },
       { where: { id: req.user.id } }
     );
+
+    // Provision an affiliate account for this vendor so they can refer others.
+    // This is non-blocking — a failure here must not prevent vendor creation.
+    ensureAffiliateAccount(req.user.id).catch((affiliateError) => {
+      console.error('Failed to provision affiliate account for vendor:', affiliateError.message);
+    });
+
+    // If this user was referred by someone, record the "vendor" qualifying
+    // activity — this triggers the referral reward for the referrer.
+    recordApprovedActivity(req.user.id, 'vendor', vendorProfile.id).catch((activityError) => {
+      console.error('Failed to record vendor affiliate activity:', activityError.message);
+    });
 
     res.status(201).json({
       success: true,

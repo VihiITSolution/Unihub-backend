@@ -11,6 +11,7 @@ const createYouTubeRightsDeclarations = require("./migrations/create-youtube-rig
 const createAdminOperations = require("./migrations/create-admin-operations");
 const createCourseNotifyRequests = require("./migrations/create-course-notify-requests");
 const createAffiliateProgram = require("./migrations/create-affiliate-program");
+const addVendorAffiliateActivity = require("./migrations/add-vendor-affiliate-activity");
 const { seedEligibleAffiliateAccounts } = require("./services/affiliate.service");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
 const { deleteExpiredChallenges } = require("./services/verification.service");
@@ -204,6 +205,7 @@ const startServer = async () => {
     await createAdminOperations();
     await createCourseNotifyRequests();
     await createAffiliateProgram(sequelize);
+    await addVendorAffiliateActivity(sequelize);
     await seedEligibleAffiliateAccounts();
 
     // Wrap Express in a plain HTTP server so Socket.io can attach to it -

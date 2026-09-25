@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { Op } = require("sequelize");
 const {
-  sequelize, User, StudentProfile, Post, PostComment,
+  sequelize, User, StudentProfile, VendorProfile, Post, PostComment,
   AffiliateCampaign, AffiliateAccount, AffiliateReferral, AffiliateRiskFlag,
   AffiliatePayoutProfile, AffiliatePayoutRequest, AffiliateLedgerEntry,
 } = require("../models");
@@ -28,6 +28,12 @@ function accountHash(accountNumber) {
   return crypto.createHmac("sha256", payoutSecret()).update(String(accountNumber).replace(/\s/g, "")).digest("hex");
 }
 function accountMask(value) { const plain = String(value || ""); return `${"•".repeat(Math.max(0, plain.length - 4))}${plain.slice(-4)}`; }
+
+/**
+ * Determine whether a user is eligible to participate in the affiliate programme
+ * as a referrer. Both verified students (with a complete student profile) and
+ * approved vendors (with a complete vendor profile) qualify.
+ */
 function isEligible(user) {
   const roles = Array.isArray(user.roles) ? user.roles : [];
   // Older accounts completed SMS verification before `verifiedPhoneNumber`
@@ -36,13 +42,23 @@ function isEligible(user) {
   const hasVerifiedMobile = Boolean(
     user.verifiedPhoneNumber || (user.phoneVerifiedAt && user.phoneNumber),
   );
-  return !!(
-    user.isActive
-    && roles.includes("student")
-    && hasVerifiedMobile
+  if (!user.isActive || !hasVerifiedMobile) return false;
+
+  // Student eligibility: verified student with a complete student profile
+  const isEligibleStudent = !!(
+    roles.includes("student")
     && (user.isStudentProfileComplete || user.studentProfile?.isProfileComplete)
   );
+
+  // Vendor eligibility: approved vendor with a complete vendor profile
+  const isEligibleVendor = !!(
+    roles.includes("vendor")
+    && (user.isVendorProfileComplete || user.vendorProfile?.isProfileComplete)
+  );
+
+  return isEligibleStudent || isEligibleVendor;
 }
+
 async function activeCampaign({ signupOnly = false, transaction } = {}) {
   const now = new Date();
   return AffiliateCampaign.findOne({
@@ -54,7 +70,13 @@ function newCode() { return `UH${crypto.randomBytes(6).toString("hex").toUpperCa
 async function ensureAffiliateAccount(userId, transaction) {
   let account = await AffiliateAccount.findOne({ where: { userId }, transaction, lock: transaction ? transaction.LOCK.UPDATE : undefined });
   if (account) return account;
-  const user = await User.findByPk(userId, { include: [{ model: StudentProfile, as: "studentProfile" }], transaction });
+  const user = await User.findByPk(userId, {
+    include: [
+      { model: StudentProfile, as: "studentProfile" },
+      { model: VendorProfile, as: "vendorProfile" },
+    ],
+    transaction,
+  });
   if (!user || !isEligible(user)) return null;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try { return await AffiliateAccount.create({ userId, referralCode: newCode() }, { transaction }); }
@@ -71,8 +93,11 @@ async function seedEligibleAffiliateAccounts() {
         { phoneVerifiedAt: { [Op.ne]: null } },
       ],
     },
-    attributes: ["id", "roles", "isActive", "phoneNumber", "verifiedPhoneNumber", "phoneVerifiedAt", "isStudentProfileComplete"],
-    include: [{ model: StudentProfile, as: "studentProfile", attributes: ["isProfileComplete"] }],
+    attributes: ["id", "roles", "isActive", "phoneNumber", "verifiedPhoneNumber", "phoneVerifiedAt", "isStudentProfileComplete", "isVendorProfileComplete"],
+    include: [
+      { model: StudentProfile, as: "studentProfile", attributes: ["isProfileComplete"] },
+      { model: VendorProfile, as: "vendorProfile", attributes: ["isProfileComplete"] },
+    ],
   });
   for (const user of users) if (isEligible(user)) await ensureAffiliateAccount(user.id);
 }
@@ -80,7 +105,17 @@ async function validateReferralCode(referralCode, transaction) {
   if (!referralCode) return null;
   const campaign = await activeCampaign({ signupOnly: true, transaction });
   if (!campaign) throw new Error("This affiliate campaign is not accepting registrations");
-  const account = await AffiliateAccount.findOne({ where: { referralCode: String(referralCode).trim().toUpperCase(), isActive: true }, include: [{ model: User, as: "user", include: [{ model: StudentProfile, as: "studentProfile" }] }], transaction });
+  const account = await AffiliateAccount.findOne({
+    where: { referralCode: String(referralCode).trim().toUpperCase(), isActive: true },
+    include: [{
+      model: User, as: "user",
+      include: [
+        { model: StudentProfile, as: "studentProfile" },
+        { model: VendorProfile, as: "vendorProfile" },
+      ],
+    }],
+    transaction,
+  });
   if (!account || !isEligible(account.user)) throw new Error("This referral code is invalid or unavailable");
   return { campaign, account };
 }
