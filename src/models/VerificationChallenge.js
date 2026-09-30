@@ -6,7 +6,7 @@ const VerificationChallenge = sequelize.define(
   {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     purpose: {
-      type: DataTypes.ENUM("registration_phone", "phone_change", "student_email"),
+      type: DataTypes.ENUM("registration_phone", "phone_change", "student_email", "password_reset_email"),
       allowNull: false,
     },
     destination: { type: DataTypes.STRING(255), allowNull: false },

@@ -1,7 +1,7 @@
-const crypto = require("crypto");
-const { Op } = require("sequelize");
-const { User, StudentProfile, TutorProfile, AdminAuditLog } = require("../models");
+const { sequelize, User, StudentProfile, TutorProfile, AdminAuditLog } = require("../models");
 const { generateToken } = require("../utils/token");
+const { sendPasswordResetCode } = require("../services/resend.service");
+const { createChallenge, consumeVerifiedChallengeForDestination } = require("../services/verification.service");
 
 /**
  * Register a new user with optional student profile
@@ -187,85 +187,79 @@ const logout = async (_req, res, next) => {
 };
 
 /**
- * Request a password reset. Always returns the same generic message whether
- * or not the email is registered, so this endpoint can't be used to probe
- * which emails have accounts.
- *
- * No email-delivery service (SMTP/nodemailer etc.) is wired up in this
- * codebase yet, so outside production the raw reset token/URL is returned
- * directly in the response - that's the only way to exercise the reset flow
- * end to end until real email delivery is added. In production this would
- * currently be a dead end for the user; wiring up an email service is a
- * separate follow-up.
+ * Request a password reset code. The same success message is returned for
+ * registered and unregistered email addresses to prevent account discovery.
  */
 const forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const email = String(req.body.email || "").trim().toLowerCase();
     const genericMessage =
-      "If an account with that email exists, a password reset link has been generated.";
+      "If an account with that email exists, a password reset code has been sent.";
 
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(200).json({ success: true, message: genericMessage });
     }
 
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    user.resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(rawToken)
-      .digest("hex");
-    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    await user.save();
-
-    const response = { success: true, message: genericMessage };
-
-    if (process.env.NODE_ENV !== "production") {
-      response.data = {
-        resetToken: rawToken,
-        resetUrl: `/auth/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`,
-      };
+    const { challenge, code } = await createChallenge({
+      purpose: "password_reset_email",
+      destination: email,
+      userId: user.id,
+      ip: req.ip,
+    });
+    try {
+      await sendPasswordResetCode(email, code);
+    } catch (error) {
+      // A code whose delivery failed must never remain usable.
+      challenge.consumedAt = new Date();
+      await challenge.save();
+      throw error;
     }
 
-    res.status(200).json(response);
+    res.status(200).json({ success: true, message: genericMessage });
   } catch (error) {
+    const message = error.message || "";
+    if (message.includes("Too many")) {
+      return res.status(429).json({ success: false, message: "Unable to send a reset code. Please try again later." });
+    }
+    if (message.includes("configured") || error.isAxiosError) {
+      return res.status(502).json({ success: false, message: "Unable to send a reset code. Please try again later." });
+    }
     next(error);
   }
 };
 
 /**
- * Complete a password reset using the token issued by forgotPassword.
+ * Complete a password reset using the code emailed by forgotPassword.
  */
 const resetPassword = async (req, res, next) => {
   try {
-    const { email, token, newPassword } = req.body;
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-
-    const user = await User.findOne({
-      where: {
-        email,
-        resetPasswordToken: hashedToken,
-        resetPasswordExpires: { [Op.gt]: new Date() },
-      },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "This reset link is invalid or has expired. Please request a new one.",
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const { code, newPassword } = req.body;
+    await sequelize.transaction(async (transaction) => {
+      const user = await User.findOne({ where: { email }, transaction, lock: transaction.LOCK.UPDATE });
+      if (!user) throw new Error("This verification code is invalid or has expired.");
+      await consumeVerifiedChallengeForDestination({
+        destination: email,
+        purpose: "password_reset_email",
+        code,
+        userId: user.id,
+        transaction,
       });
-    }
-
-    user.password = newPassword.trim();
-    user.resetPasswordToken = null;
-    user.resetPasswordExpires = null;
-    await user.save();
+      user.password = newPassword.trim();
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save({ transaction });
+    });
 
     res.status(200).json({
       success: true,
       message: "Password reset successfully. You can now log in with your new password.",
     });
   } catch (error) {
+    if (/invalid or has expired/i.test(error.message || "")) {
+      return res.status(400).json({ success: false, message: "This reset code is invalid or has expired. Please request a new one." });
+    }
     next(error);
   }
 };

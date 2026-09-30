@@ -110,8 +110,29 @@ async function consumeVerifiedChallenge({ id, purpose, code, userId = null, tran
   return challenge;
 }
 
+async function consumeVerifiedChallengeForDestination({ destination, purpose, code, userId = null, transaction }) {
+  const challenge = await VerificationChallenge.findOne({
+    where: { purpose, destination, userId, consumedAt: null },
+    order: [["createdAt", "DESC"]],
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined,
+  });
+  if (!challenge || challenge.expiresAt <= new Date() || challenge.attemptCount >= MAX_ATTEMPTS) {
+    throw new Error("This verification code is invalid or has expired.");
+  }
+  if (!/^[0-9]{6}$/.test(String(code)) || !crypto.timingSafeEqual(Buffer.from(challenge.codeHash), Buffer.from(hash(`code:${code}`)))) {
+    challenge.attemptCount += 1;
+    if (challenge.attemptCount >= MAX_ATTEMPTS) challenge.consumedAt = new Date();
+    await challenge.save({ transaction });
+    throw new Error("This verification code is invalid or has expired.");
+  }
+  challenge.consumedAt = new Date();
+  await challenge.save({ transaction });
+  return challenge;
+}
+
 async function deleteExpiredChallenges() {
   await VerificationChallenge.destroy({ where: { expiresAt: { [Op.lt]: new Date(Date.now() - 24 * 60 * 60 * 1000) } } });
 }
 
-module.exports = { createChallenge, resendChallenge, consumeVerifiedChallenge, deleteExpiredChallenges, encryptRegistrationPayload, decryptRegistrationPayload };
+module.exports = { createChallenge, resendChallenge, consumeVerifiedChallenge, consumeVerifiedChallengeForDestination, deleteExpiredChallenges, encryptRegistrationPayload, decryptRegistrationPayload };

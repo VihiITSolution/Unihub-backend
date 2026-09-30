@@ -131,7 +131,7 @@ router.post(
   authLimiter,
   [
     body("email").isEmail().withMessage("Valid email is required"),
-    body("token").notEmpty().withMessage("Reset token is required"),
+    body("code").isLength({ min: 6, max: 6 }).isNumeric().withMessage("Enter the six-digit reset code"),
     body("newPassword")
       .isLength({ min: 8 })
       .withMessage("Password must be at least 8 characters"),
