@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { sequelize, AffiliateReferral, AffiliateRiskFlag, AffiliatePayoutRequest, AffiliateLedgerEntry, User, StudentProfile, VendorProfile } = require("../models");
 const { approveReferral, decryptDetails } = require("../services/affiliate.service");
+const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 
 const pageValues = (query) => ({ page: Math.max(Number(query.page) || 1, 1), limit: Math.min(Math.max(Number(query.limit) || 20, 1), 100) });
 async function listReferrals(req, res, next) {
@@ -26,9 +27,11 @@ async function reviewReferral(req, res, next) {
     const action = req.body.action; const referral = await AffiliateReferral.findByPk(req.params.id);
     if (!referral) return res.status(404).json({ success: false, message: "Referral not found" });
     if (action === "approve") {
+      if (["available", "reversed"].includes(referral.status)) return res.status(409).json({ success: false, message: "Referral cannot be approved in its current state" });
       await AffiliateRiskFlag.update({ status: "cleared", resolvedBy: req.user.id, resolvedAt: new Date() }, { where: { referralId: referral.id, status: "open" } });
       const approved = await approveReferral(referral.id, req.user.id);
-      return res.json({ success: true, data: { referral: approved } });
+      const emailSent = await notifyApprovalByEmail(approved.referrerUserId, "affiliateReferral");
+      return res.json({ success: true, data: { referral: approved, emailSent } });
     }
     if (action === "hold") { await referral.update({ status: "held", reviewedBy: req.user.id, rejectionReason: req.body.reason || null }); return res.json({ success: true, data: { referral } }); }
     if (action === "reject" || action === "reverse") {
@@ -62,7 +65,12 @@ async function reviewPayout(req, res, next) {
   try {
     const payout = await AffiliatePayoutRequest.findByPk(req.params.id);
     if (!payout || payout.status !== "pending") return res.status(400).json({ success: false, message: "Only pending payouts can be reviewed" });
-    if (req.body.action === "approve") { await payout.update({ status: "approved", reviewedBy: req.user.id, reviewedAt: new Date() }); await AffiliateRiskFlag.update({ status: "cleared", resolvedBy: req.user.id, resolvedAt: new Date() }, { where: { payoutRequestId: payout.id, status: "open" } }); return res.json({ success: true, data: { payout } }); }
+    if (req.body.action === "approve") {
+      await payout.update({ status: "approved", reviewedBy: req.user.id, reviewedAt: new Date() });
+      const emailSent = await notifyApprovalByEmail(payout.userId, "affiliatePayout");
+      await AffiliateRiskFlag.update({ status: "cleared", resolvedBy: req.user.id, resolvedAt: new Date() }, { where: { payoutRequestId: payout.id, status: "open" } });
+      return res.json({ success: true, data: { payout, emailSent } });
+    }
     if (req.body.action === "reject") { await sequelize.transaction(async (transaction) => { await payout.update({ status: "rejected", reviewedBy: req.user.id, reviewedAt: new Date(), rejectionReason: req.body.reason || "Rejected by admin" }, { transaction }); await AffiliateLedgerEntry.create({ userId: payout.userId, campaignId: payout.campaignId, payoutRequestId: payout.id, type: "release", amount: payout.amount, metadata: { reason: payout.rejectionReason } }, { transaction }); }); return res.json({ success: true, data: { payout } }); }
     return res.status(400).json({ success: false, message: "Use approve or reject" });
   } catch (error) { next(error); }

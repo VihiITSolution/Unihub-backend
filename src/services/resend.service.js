@@ -46,4 +46,22 @@ async function sendPasswordResetCode(email, code) {
   );
 }
 
-module.exports = { sendStudentEmailVerification, sendPasswordResetCode };
+async function sendApprovalEmail(email, subject, text) {
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+    throw new Error("Approval email is not configured");
+  }
+
+  await axios.post(
+    "https://api.resend.com/emails",
+    { from: process.env.EMAIL_FROM, to: [email], subject, text },
+    {
+      timeout: Number(process.env.RESEND_TIMEOUT_MS || 10000),
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+}
+
+module.exports = { sendStudentEmailVerification, sendPasswordResetCode, sendApprovalEmail };

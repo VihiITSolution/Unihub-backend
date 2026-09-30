@@ -118,13 +118,14 @@ async function consumeVerifiedChallengeForDestination({ destination, purpose, co
     lock: transaction ? transaction.LOCK.UPDATE : undefined,
   });
   if (!challenge || challenge.expiresAt <= new Date() || challenge.attemptCount >= MAX_ATTEMPTS) {
-    throw new Error("This verification code is invalid or has expired.");
+    return null;
   }
   if (!/^[0-9]{6}$/.test(String(code)) || !crypto.timingSafeEqual(Buffer.from(challenge.codeHash), Buffer.from(hash(`code:${code}`)))) {
     challenge.attemptCount += 1;
     if (challenge.attemptCount >= MAX_ATTEMPTS) challenge.consumedAt = new Date();
     await challenge.save({ transaction });
-    throw new Error("This verification code is invalid or has expired.");
+    // Let the caller commit the transaction so the failed attempt is retained.
+    return null;
   }
   challenge.consumedAt = new Date();
   await challenge.save({ transaction });

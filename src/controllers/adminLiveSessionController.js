@@ -5,6 +5,7 @@ const {
   LiveSessionProviderJob, LiveSessionEvent,
 } = require("../models");
 const provider = require("../services/liveSessionProviderService");
+const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 
 const tutorInclude = { model: User, as: "tutor", attributes: ["id", "firstName", "lastName", "email", "profileImage"], include: [{ model: TutorProfile, as: "tutorProfile", attributes: ["teamsEmail"] }] };
 
@@ -73,6 +74,7 @@ async function approve(req, res, next) {
     if (!provider.enabled()) return res.status(503).json({ success: false, message: "Teams live-session approvals are disabled by feature flag" });
     const pendingSession = await LiveSession.findByPk(req.params.id);
     if (!pendingSession) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (pendingSession.approvalStatus === "approved") return res.status(409).json({ success: false, message: "Live session is already approved" });
     const tutor = await User.findByPk(pendingSession.tutorId);
     const identity = await provider.getIdentityStatus(tutor);
     if (!identity || identity.invitationStatus !== "accepted") return res.status(409).json({ success: false, message: "Tutor must accept the Microsoft Teams invitation before approval" });
@@ -83,15 +85,17 @@ async function approve(req, res, next) {
       if (!organizer) { const error = new Error("No enabled Teams organizer account is configured"); error.statusCode = 409; throw error; }
       const session = await LiveSession.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!session) { const error = new Error("Live session not found"); error.statusCode = 404; throw error; }
+      if (session.approvalStatus === "approved") { const error = new Error("Live session is already approved"); error.statusCode = 409; throw error; }
       if (session.status === "cancelled") { const error = new Error("Cancelled sessions cannot be approved"); error.statusCode = 400; throw error; }
       await provider.assertNoConflict(session.scheduledStartTime, session.scheduledEndTime, session.id, transaction);
       await session.update({ approvalStatus: "approved", rejectionReason: null, approvedBy: req.user.id, approvedAt: new Date(), providerStatus: "not_provisioned" }, { transaction });
       await provider.event(session.id, req.user.id, "request.approved", null, transaction);
       return session;
     });
+    const emailSent = await notifyApprovalByEmail(result.tutorId, "liveSession", result.title);
     await provider.enqueue(result.id, "provision", null, "initial");
     await provider.notifySessionUsers(result.id, "Live session approved", `${result.title} was approved and is being prepared in Microsoft Teams.`);
-    res.json({ success: true, message: "Session approved; Teams provisioning queued", data: { session: result } });
+    res.json({ success: true, message: "Session approved; Teams provisioning queued", data: { session: result, emailSent } });
   } catch (error) { next(error); }
 }
 

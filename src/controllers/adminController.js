@@ -21,6 +21,7 @@ const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
 const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
 const { recordApprovedActivity, recordQualifyingVideoActivity } = require("../services/affiliate.service");
+const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 
 /**
  * Get all users (Admin only)
@@ -740,6 +741,7 @@ const approveCourse = async (req, res, next) => {
     course.rejectionReason = null;
 
     await course.save();
+    const emailSent = await notifyApprovalByEmail(course.tutorId, "course", course.title);
     const qualifyingVideo = await CourseContent.findOne({
       where: { courseId: course.id, type: "video", duration: { [Op.gt]: 20 } },
       order: [["createdAt", "ASC"]],
@@ -749,7 +751,7 @@ const approveCourse = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "Course approved and published successfully",
-      data: { course },
+      data: { course, emailSent },
     });
   } catch (error) {
     next(error);
@@ -895,12 +897,13 @@ const approveMarketplaceItem = async (req, res, next) => {
     }
 
     await item.save();
+    const emailSent = await notifyApprovalByEmail(item.sellerId, "marketplace", item.title);
     await recordApprovedActivity(item.sellerId, "marketplace", item.id);
 
     res.status(200).json({
       success: true,
       message: "Marketplace item approved successfully",
-      data: { item },
+      data: { item, emailSent },
     });
   } catch (error) {
     next(error);
@@ -1203,12 +1206,15 @@ const approveTutorProfile = async (req, res, next) => {
       // Don't fail the request if notification fails
     }
 
+    const emailSent = await notifyApprovalByEmail(user.id, "tutor");
+
     // Step 7: Return success response
     console.log("✅ [BACKEND] Returning success response");
     res.status(200).json({
       success: true,
       message: "Tutor application approved successfully",
       data: {
+        emailSent,
         profile: {
           ...profile.toJSON(),
           user: user.toJSON(),
@@ -1415,9 +1421,10 @@ const approveBoardingPlace = async (req, res, next) => {
     }
 
     await place.save();
+    const emailSent = await notifyApprovalByEmail(place.vendorId, "boarding", place.title);
     await recordApprovedActivity(place.vendorId, "boarding", place.id);
 
-    res.status(200).json({ success: true, message: "Boarding place approved successfully", data: { place } });
+    res.status(200).json({ success: true, message: "Boarding place approved successfully", data: { place, emailSent } });
   } catch (error) {
     next(error);
   }

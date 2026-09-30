@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const payhereService = require('../services/payhere.service');
 const helapayService = require('../services/helapay.service');
 const { calculateExpirationDate } = require('./marketplaceController');
+const { notifyApprovalByEmail } = require('../services/approvalEmail.service');
 
 // Replace uuid with crypto for generating unique IDs
 const uuidv4 = () => crypto.randomUUID();
@@ -465,6 +466,9 @@ const verifyBankTransfer = async (req, res, next) => {
     }
     payment.metadata = JSON.stringify(metadata);
     await payment.save();
+    const emailSent = approved
+      ? await notifyApprovalByEmail(payment.userId, 'bankTransfer')
+      : false;
     
     // If approved, update marketplace item
     if (approved && payment.marketplaceItem) {
@@ -475,11 +479,11 @@ const verifyBankTransfer = async (req, res, next) => {
       // Keep approval status as pending for admin review
       await item.save();
     }
-    
+
     res.status(200).json({
       success: true,
       message: approved ? 'Bank transfer verified successfully' : 'Bank transfer rejected',
-      data: { payment }
+      data: { payment, emailSent }
     });
     
   } catch (error) {

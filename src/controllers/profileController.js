@@ -1,5 +1,6 @@
 const { User, StudentProfile, TutorProfile } = require("../models");
 const { createNotification, notifyActiveAdmins } = require("./notificationController");
+const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 
 /**
  * Get student profile for current user
@@ -287,6 +288,9 @@ const reviewTutorApplication = async (req, res, next) => {
     }
 
     if (action === "approve") {
+      if (profile.approvalStatus === "approved") {
+        return res.status(409).json({ success: false, message: "Tutor profile is already approved" });
+      }
       await profile.update({
         isApproved: true,
         approvalStatus: "approved",
@@ -331,10 +335,12 @@ const reviewTutorApplication = async (req, res, next) => {
         // Don't throw - continue with success response
       }
 
+      const emailSent = await notifyApprovalByEmail(user.id, "tutor");
+
       res.status(200).json({
         success: true,
         message: "Tutor application approved",
-        data: { profile },
+        data: { profile, emailSent },
       });
     } else if (action === "reject") {
       await profile.update({

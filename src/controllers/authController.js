@@ -236,30 +236,32 @@ const resetPassword = async (req, res, next) => {
   try {
     const email = String(req.body.email || "").trim().toLowerCase();
     const { code, newPassword } = req.body;
-    await sequelize.transaction(async (transaction) => {
+    const reset = await sequelize.transaction(async (transaction) => {
       const user = await User.findOne({ where: { email }, transaction, lock: transaction.LOCK.UPDATE });
-      if (!user) throw new Error("This verification code is invalid or has expired.");
-      await consumeVerifiedChallengeForDestination({
+      if (!user) return false;
+      const challenge = await consumeVerifiedChallengeForDestination({
         destination: email,
         purpose: "password_reset_email",
         code,
         userId: user.id,
         transaction,
       });
+      if (!challenge) return false;
       user.password = newPassword.trim();
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save({ transaction });
+      return true;
     });
+    if (!reset) {
+      return res.status(400).json({ success: false, message: "This reset code is invalid or has expired. Please request a new one." });
+    }
 
     res.status(200).json({
       success: true,
       message: "Password reset successfully. You can now log in with your new password.",
     });
   } catch (error) {
-    if (/invalid or has expired/i.test(error.message || "")) {
-      return res.status(400).json({ success: false, message: "This reset code is invalid or has expired. Please request a new one." });
-    }
     next(error);
   }
 };
