@@ -13,6 +13,7 @@ const {
 } = require("../models");
 const { Op } = require("sequelize");
 const { notifyActiveAdmins } = require("./notificationController");
+const { parseCourseDuration } = require("../utils/courseDuration");
 
 /**
  * Create a new course (Tutor only)
@@ -31,12 +32,17 @@ const createCourse = async (req, res, next) => {
       level,
       price,
       duration,
+      durationMinutes,
       videoUrl,
       contentUrl,
     } = req.body;
 
     // Handle thumbnail from file upload
     const thumbnail = req.file ? req.file.path : null;
+    const parsedDuration = parseCourseDuration(duration, durationMinutes);
+    if (parsedDuration === null) {
+      return res.status(400).json({ success: false, message: "Enter a duration of at least one minute, with minutes between 0 and 59." });
+    }
 
     // Use category as the foreign key
     let finalCategory = category;
@@ -60,7 +66,8 @@ const createCourse = async (req, res, next) => {
       year: year ? parseInt(year) : null,
       level,
       price,
-      duration,
+      duration: parsedDuration?.hours ?? null,
+      durationMinutes: parsedDuration?.minutes ?? 0,
       thumbnail,
       videoUrl,
       contentUrl,
@@ -294,6 +301,7 @@ const updateCourse = async (req, res, next) => {
       year,
       price,
       duration,
+      durationMinutes,
       thumbnail,
       videoUrl,
       contentUrl,
@@ -314,7 +322,14 @@ const updateCourse = async (req, res, next) => {
       course.year = year && year !== "" ? parseInt(year) : null;
     }
     if (price !== undefined) course.price = price;
-    if (duration) course.duration = duration;
+    const parsedDuration = parseCourseDuration(duration, durationMinutes, course);
+    if (parsedDuration === null) {
+      return res.status(400).json({ success: false, message: "Enter a duration of at least one minute, with minutes between 0 and 59." });
+    }
+    if (parsedDuration) {
+      course.duration = parsedDuration.hours;
+      course.durationMinutes = parsedDuration.minutes;
+    }
     // Handle new thumbnail upload from Cloudinary
     if (req.file) course.thumbnail = req.file.path;
     if (videoUrl) course.videoUrl = videoUrl;

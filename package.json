@@ -12,6 +12,7 @@
     "migrate:teams": "node src/migrations/20260902-teams-live-sessions.js",
     "migrate:sms-auth": "node src/migrations/20260905-sms-authentication.js && node src/migrations/20260905-grandfather-existing-phone-verification.js",
     "migrate:password-reset-email": "node src/migrations/20260905-sms-authentication.js && node src/migrations/20260930-password-reset-email-otp.js",
+    "migrate:course-duration-minutes": "node src/migrations/20261001-course-duration-minutes.js",
     "seed": "node src/migrations/seed.js",
     "test": "node --test test/*.test.js"
   },

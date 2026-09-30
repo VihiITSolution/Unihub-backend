@@ -90,7 +90,15 @@ const Course = sequelize.define(
     },
     duration: {
       type: DataTypes.INTEGER,
-      comment: "Duration in hours",
+      comment: "Whole hours in the total course duration",
+    },
+    durationMinutes: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: "duration_minutes",
+      validate: { min: 0, max: 59 },
+      comment: "Remaining minutes in the total course duration",
     },
     thumbnail: {
       type: DataTypes.STRING(255),

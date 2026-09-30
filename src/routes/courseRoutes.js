@@ -49,6 +49,12 @@ const router = express.Router();
  *                 type: number
  *               duration:
  *                 type: integer
+ *                 description: Whole hours of total course duration
+ *               durationMinutes:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 59
+ *                 description: Remaining minutes of total course duration
  *               thumbnail:
  *                 type: string
  *               videoUrl:
