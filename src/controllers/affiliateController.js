@@ -5,7 +5,7 @@ async function getAffiliateMe(req, res, next) {
   try {
     const account = await ensureAffiliateAccount(req.user.id);
     const campaign = await activeCampaign() || await AffiliateCampaign.findOne({ order: [["startsAt", "DESC"]] });
-    if (!account) return res.status(403).json({ success: false, message: "A verified active profile is required to use the affiliate programme. Students need a complete student profile; vendors need an approved vendor profile." });
+    if (!account) return res.status(403).json({ success: false, message: "An active, verified profile is required to use the affiliate programme. Students need a complete student profile; tutors and vendors need approved profiles." });
     const [referrals, profile, payouts, totals] = await Promise.all([
       campaign ? AffiliateReferral.findAll({ where: { campaignId: campaign.id, referrerUserId: req.user.id }, include: [{ model: User, as: "referred", attributes: ["id", "firstName", "lastName", "email"] }, { association: "riskFlags", attributes: ["id", "type", "status"] }], order: [["createdAt", "DESC"]] }) : [],
       AffiliatePayoutProfile.findOne({ where: { userId: req.user.id } }),

@@ -20,7 +20,7 @@ const BoardingPlace = require("../models/BoardingPlace");
 const { Op } = require("sequelize");
 const { createNotification } = require("./notificationController");
 const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
-const { recordApprovedActivity, recordQualifyingVideoActivity } = require("../services/affiliate.service");
+const { ensureAffiliateAccount, recordApprovedActivity, recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 
 /**
@@ -1185,6 +1185,12 @@ const approveTutorProfile = async (req, res, next) => {
       user.roles,
       user.primaryRole,
     );
+
+    // Approved tutors can participate in the affiliate programme immediately.
+    // A failure here must not roll back their tutor approval.
+    ensureAffiliateAccount(user.id).catch((affiliateError) => {
+      console.error("Failed to provision affiliate account for tutor:", affiliateError.message);
+    });
 
     // Step 6: Create notification (non-blocking)
     console.log("📝 [BACKEND] Creating notification for user:", user.id);

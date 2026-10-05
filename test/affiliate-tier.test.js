@@ -30,6 +30,19 @@ test("affiliate eligibility accepts legacy SMS verification while requiring an a
   assert.equal(isEligible({ ...legacyVerifiedStudent, isStudentProfileComplete: false }), false);
 });
 
+test("affiliate eligibility accepts an active approved tutor profile", () => {
+  const approvedTutor = {
+    isActive: true,
+    roles: ["tutor"],
+    verifiedPhoneNumber: "+94771234567",
+    isTutorProfileComplete: true,
+    tutorProfile: { isApproved: true, approvalStatus: "approved", isProfileComplete: true },
+  };
+
+  assert.equal(isEligible(approvedTutor), true);
+  assert.equal(isEligible({ ...approvedTutor, tutorProfile: { ...approvedTutor.tutorProfile, isApproved: false, approvalStatus: "pending" } }), false);
+});
+
 test("only an approved course video strictly longer than 20 minutes qualifies", () => {
   const course = { approvalStatus: "approved", isPublished: true };
   assert.equal(isQualifyingVideoActivity(course, { type: "video", duration: 20 }), false);

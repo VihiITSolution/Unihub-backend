@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { Op } = require("sequelize");
 const {
-  sequelize, User, StudentProfile, VendorProfile, Post, PostComment,
+  sequelize, User, StudentProfile, TutorProfile, VendorProfile, Post, PostComment,
   AffiliateCampaign, AffiliateAccount, AffiliateReferral, AffiliateRiskFlag,
   AffiliatePayoutProfile, AffiliatePayoutRequest, AffiliateLedgerEntry,
 } = require("../models");
@@ -31,8 +31,8 @@ function accountMask(value) { const plain = String(value || ""); return `${"•"
 
 /**
  * Determine whether a user is eligible to participate in the affiliate programme
- * as a referrer. Both verified students (with a complete student profile) and
- * approved vendors (with a complete vendor profile) qualify.
+ * as a referrer. Verified students, approved tutors, and approved vendors
+ * with complete profiles qualify.
  */
 function isEligible(user) {
   const roles = Array.isArray(user.roles) ? user.roles : [];
@@ -56,7 +56,13 @@ function isEligible(user) {
     && (user.isVendorProfileComplete || user.vendorProfile?.isProfileComplete)
   );
 
-  return isEligibleStudent || isEligibleVendor;
+  const isEligibleTutor = !!(
+    roles.includes("tutor")
+    && (user.isTutorProfileComplete || user.tutorProfile?.isProfileComplete)
+    && (user.tutorProfile?.isApproved || user.tutorProfile?.approvalStatus === "approved")
+  );
+
+  return isEligibleStudent || isEligibleTutor || isEligibleVendor;
 }
 
 async function activeCampaign({ signupOnly = false, transaction } = {}) {
@@ -73,6 +79,7 @@ async function ensureAffiliateAccount(userId, transaction) {
   const user = await User.findByPk(userId, {
     include: [
       { model: StudentProfile, as: "studentProfile" },
+      { model: TutorProfile, as: "tutorProfile" },
       { model: VendorProfile, as: "vendorProfile" },
     ],
     transaction,
@@ -93,9 +100,10 @@ async function seedEligibleAffiliateAccounts() {
         { phoneVerifiedAt: { [Op.ne]: null } },
       ],
     },
-    attributes: ["id", "roles", "isActive", "phoneNumber", "verifiedPhoneNumber", "phoneVerifiedAt", "isStudentProfileComplete", "isVendorProfileComplete"],
+    attributes: ["id", "roles", "isActive", "phoneNumber", "verifiedPhoneNumber", "phoneVerifiedAt", "isStudentProfileComplete", "isTutorProfileComplete", "isVendorProfileComplete"],
     include: [
       { model: StudentProfile, as: "studentProfile", attributes: ["isProfileComplete"] },
+      { model: TutorProfile, as: "tutorProfile", attributes: ["isProfileComplete", "isApproved", "approvalStatus"] },
       { model: VendorProfile, as: "vendorProfile", attributes: ["isProfileComplete"] },
     ],
   });
@@ -111,6 +119,7 @@ async function validateReferralCode(referralCode, transaction) {
       model: User, as: "user",
       include: [
         { model: StudentProfile, as: "studentProfile" },
+        { model: TutorProfile, as: "tutorProfile" },
         { model: VendorProfile, as: "vendorProfile" },
       ],
     }],
