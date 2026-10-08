@@ -513,7 +513,19 @@ const submitForReview = async (req, res, next) => {
       });
     }
 
-    // Only allow submitting draft or rejected courses
+    // A duplicate click (or an older frontend bundle that has not refreshed
+    // its course state yet) must not make an already-submitted course look
+    // like a failed submission. Pending is the desired terminal state for
+    // this action, so acknowledge it without creating another notification.
+    if (course.approvalStatus === "pending") {
+      return res.status(200).json({
+        success: true,
+        message: "Course is already awaiting admin review",
+        data: { course },
+      });
+    }
+
+    // Only allow submitting draft or rejected courses.
     if (
       course.approvalStatus !== "draft" &&
       course.approvalStatus !== "rejected"
