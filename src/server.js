@@ -12,6 +12,7 @@ const createAdminOperations = require("./migrations/create-admin-operations");
 const createCourseNotifyRequests = require("./migrations/create-course-notify-requests");
 const createAffiliateProgram = require("./migrations/create-affiliate-program");
 const addVendorAffiliateActivity = require("./migrations/add-vendor-affiliate-activity");
+const extendAffiliateSignupDeadline = require("./migrations/extend-affiliate-signup-deadline");
 const { seedEligibleAffiliateAccounts } = require("./services/affiliate.service");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
 const { deleteExpiredChallenges } = require("./services/verification.service");
@@ -206,6 +207,7 @@ const startServer = async () => {
     await createCourseNotifyRequests();
     await createAffiliateProgram(sequelize);
     await addVendorAffiliateActivity(sequelize);
+    await extendAffiliateSignupDeadline(sequelize);
     await seedEligibleAffiliateAccounts();
 
     // Wrap Express in a plain HTTP server so Socket.io can attach to it -

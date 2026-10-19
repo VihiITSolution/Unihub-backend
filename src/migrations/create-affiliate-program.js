@@ -1,4 +1,5 @@
 const { DataTypes } = require("sequelize");
+const { CAMPAIGN_NAME, SIGNUP_DEADLINE_UTC } = require("../config/affiliateCampaign");
 
 async function createAffiliateProgram(sequelize) {
   const qi = sequelize.getQueryInterface();
@@ -14,7 +15,7 @@ async function createAffiliateProgram(sequelize) {
   await create("affiliate_payout_profiles", { id, user_id: { type: DataTypes.INTEGER, allowNull: false, unique: true }, encrypted_details: { type: DataTypes.JSON, allowNull: false }, account_hash: { type: DataTypes.STRING(64), allowNull: false }, account_mask: { type: DataTypes.STRING(32), allowNull: false }, ...dates });
   await create("affiliate_payout_requests", { id, user_id: { type: DataTypes.INTEGER, allowNull: false }, campaign_id: { type: DataTypes.INTEGER, allowNull: false }, amount: { type: DataTypes.INTEGER, allowNull: false }, status: { type: DataTypes.STRING(20), allowNull: false }, encrypted_bank_snapshot: { type: DataTypes.JSON, allowNull: false }, account_mask: { type: DataTypes.STRING(32), allowNull: false }, reviewed_by: { type: DataTypes.INTEGER }, reviewed_at: { type: DataTypes.DATE }, rejection_reason: { type: DataTypes.TEXT }, paid_by: { type: DataTypes.INTEGER }, paid_at: { type: DataTypes.DATE }, transfer_reference: { type: DataTypes.STRING(120) }, ...dates });
   await create("affiliate_ledger_entries", { id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true, allowNull: false }, user_id: { type: DataTypes.INTEGER, allowNull: false }, campaign_id: { type: DataTypes.INTEGER, allowNull: false }, referral_id: { type: DataTypes.INTEGER }, payout_request_id: { type: DataTypes.INTEGER }, type: { type: DataTypes.STRING(20), allowNull: false }, amount: { type: DataTypes.INTEGER, allowNull: false }, metadata: { type: DataTypes.JSON }, ...dates });
-  const [campaigns] = await sequelize.query("SELECT id FROM affiliate_campaigns WHERE name = ? LIMIT 1", { replacements: ["15-Day Student Affiliate Launch"] });
-  if (!campaigns.length) await sequelize.query("INSERT INTO affiliate_campaigns (name, timezone, starts_at, signup_ends_at, minimum_redemption, approved_referral_count, is_active, tier_rules, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?, NOW(), NOW())", { replacements: ["15-Day Student Affiliate Launch", "Asia/Colombo", "2026-09-06 18:30:00", "2026-10-21 18:29:59", 2000, JSON.stringify([{ through: 20, amount: 20 }, { through: 100, amount: 30 }, { through: null, amount: 40 }])] });
+  const [campaigns] = await sequelize.query("SELECT id FROM affiliate_campaigns WHERE name = ? LIMIT 1", { replacements: [CAMPAIGN_NAME] });
+  if (!campaigns.length) await sequelize.query("INSERT INTO affiliate_campaigns (name, timezone, starts_at, signup_ends_at, minimum_redemption, approved_referral_count, is_active, tier_rules, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 1, ?, NOW(), NOW())", { replacements: [CAMPAIGN_NAME, "Asia/Colombo", "2026-09-06 18:30:00", new Date(SIGNUP_DEADLINE_UTC), 2000, JSON.stringify([{ through: 20, amount: 20 }, { through: 100, amount: 30 }, { through: null, amount: 40 }])] });
 }
 module.exports = createAffiliateProgram;
