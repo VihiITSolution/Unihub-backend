@@ -126,6 +126,16 @@ const addCourseContent = async (req, res, next) => {
     let youtubeRightsConfirmedAt = null;
 
     if (type === "video" && req.file) {
+      const declaration = await YouTubeRightsDeclaration.findOne({
+        where: { userId: course.tutorId },
+      });
+      if (!declaration) {
+        return res.status(428).json({
+          success: false,
+          code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
+          message: "Sign the one-time rights declaration before your first video upload or YouTube link.",
+        });
+      }
       // Upload video to YouTube as unlisted
       const videoPath = req.file.path;
       const videoTitle = `${title} - Course ${courseId}`;

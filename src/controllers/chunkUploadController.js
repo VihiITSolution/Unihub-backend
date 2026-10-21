@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const { CourseContent, Course } = require("../models");
+const { CourseContent, Course, YouTubeRightsDeclaration } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const { recordQualifyingVideoActivity } = require("../services/affiliate.service");
 
@@ -64,6 +64,24 @@ const completeChunkedUpload = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Missing required fields." });
     }
 
+    const course = await Course.findByPk(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+    const isAdmin = req.user.roles?.includes("admin") || req.user.primaryRole === "admin";
+    if (!isAdmin && Number(course.tutorId) !== Number(req.user.id)) {
+      return res.status(403).json({ success: false, message: "You can only add content to your own courses." });
+    }
+    if (type !== "video") {
+      return res.status(400).json({ success: false, message: "Chunked uploads only support videos." });
+    }
+    const declaration = await YouTubeRightsDeclaration.findOne({ where: { userId: course.tutorId } });
+    if (!declaration) {
+      return res.status(428).json({
+        success: false,
+        code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
+        message: "Sign the one-time rights declaration before your first video upload or YouTube link.",
+      });
+    }
+
     const n = parseInt(totalChunks, 10);
     const ext = path.extname(fileName) || ".mp4";
     const assembledFilename = `video-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
@@ -124,7 +142,6 @@ const completeChunkedUpload = async (req, res, next) => {
       order: order ? parseInt(order, 10) : 0,
       isPreview: isPreview === "true" || isPreview === true,
     });
-    const course = await Course.findByPk(courseId);
     await recordQualifyingVideoActivity(course, content);
 
     res.status(201).json({ success: true, message: "Course content added successfully", data: { content } });

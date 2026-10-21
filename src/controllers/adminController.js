@@ -1087,7 +1087,13 @@ const getTutorProfileDetails = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: tutorProfile,
+      data: {
+        ...tutorProfile.toJSON(),
+        youtubeRightsDeclaration: await YouTubeRightsDeclaration.findOne({
+          where: { userId: tutorProfile.userId },
+          attributes: ["id", "signatoryName", "acceptedAt", "agreementVersion"],
+        }),
+      },
     });
   } catch (error) {
     next(error);
