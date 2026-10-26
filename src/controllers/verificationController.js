@@ -7,6 +7,8 @@ const { sendVerificationSms } = require("../services/smsgo.service");
 const { sendStudentEmailVerification } = require("../services/resend.service");
 const { createChallenge, resendChallenge, consumeVerifiedChallenge, encryptRegistrationPayload, decryptRegistrationPayload } = require("../services/verification.service");
 const { validateReferralCode, createReferralAttribution, ensureAffiliateAccount } = require("../services/affiliate.service");
+const { validateLiveSessionReferralInvite, enrollReferralStudentInLiveSession, parseSessionId } = require("../services/liveSessionReferral.service");
+const provider = require("../services/liveSessionProviderService");
 
 const responseForChallenge = (challenge) => ({
   challengeId: challenge.id,
@@ -86,7 +88,15 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
     ]);
     if (existingEmail) return res.status(400).json({ success: false, message: "Email already registered" });
     if (existingPhone) return res.status(400).json({ success: false, message: "This mobile number is already in use" });
-    if (req.body.referralCode) await validateReferralCode(req.body.referralCode);
+    const referral = req.body.referralCode ? await validateReferralCode(req.body.referralCode) : null;
+    const liveSessionInviteId = req.body.liveSessionInviteId ? parseSessionId(req.body.liveSessionInviteId) : null;
+    if (liveSessionInviteId) {
+      if (!referral) return res.status(400).json({ success: false, message: "This live-session invitation is missing its tutor referral." });
+      await validateLiveSessionReferralInvite({
+        sessionId: liveSessionInviteId,
+        referrerUserId: referral.account.userId,
+      });
+    }
 
     const registrationPayload = {
       firstName: req.body.firstName.trim(), lastName: req.body.lastName.trim(), email,
@@ -96,6 +106,8 @@ const startRegistrationPhoneVerification = async (req, res, next) => {
       studentProfile: req.body.studentProfile || null,
       studentEmail: req.body.studentEmail ? req.body.studentEmail.trim().toLowerCase() : null,
       referralCode: req.body.referralCode ? String(req.body.referralCode).trim().toUpperCase() : null,
+      referralUserId: referral?.account.userId || null,
+      liveSessionInviteId,
     };
     if (!registrationPayload.roles.length) registrationPayload.roles = ["student"];
     if (!registrationPayload.roles.includes(registrationPayload.primaryRole)) registrationPayload.primaryRole = registrationPayload.roles[0];
@@ -130,6 +142,7 @@ const resendRegistrationPhoneVerification = async (req, res, next) => {
 const verifyRegistrationPhone = async (req, res, next) => {
   try {
     let user;
+    let referralSession = null;
     await sequelize.transaction(async (transaction) => {
       const challenge = await consumeVerifiedChallenge({ id: req.body.challengeId, purpose: "registration_phone", code: req.body.code, transaction });
       const pending = decryptRegistrationPayload(challenge.registrationPayload);
@@ -152,7 +165,22 @@ const verifyRegistrationPhone = async (req, res, next) => {
       }
       await ensureAffiliateAccount(user.id, transaction);
       await createReferralAttribution({ referralCode: pending.referralCode, referredUserId: user.id, transaction });
+      if (pending.liveSessionInviteId) {
+        referralSession = await enrollReferralStudentInLiveSession({
+          sessionId: pending.liveSessionInviteId,
+          referrerUserId: pending.referralUserId,
+          studentId: user.id,
+          transaction,
+        });
+      }
     });
+    if (referralSession?.created && referralSession.session.provider === "teams" && referralSession.session.providerStatus === "ready") {
+      try {
+        await provider.enqueue(referralSession.session.id, "attendee_sync");
+      } catch (providerError) {
+        console.error("Unable to queue Teams sync for referral enrollment:", providerError.message);
+      }
+    }
     const userWithProfile = await User.findByPk(user.id, { include: [{ model: StudentProfile, as: "studentProfile" }] });
     res.status(201).json({ success: true, message: "Mobile verified and account created", data: { user: userWithProfile, token: generateToken(user.id) } });
   } catch (error) {

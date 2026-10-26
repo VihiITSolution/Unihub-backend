@@ -3,6 +3,7 @@ const { sequelize, LiveSession, User, Course, TutorProfile, LiveSessionMeeting, 
 const youtubeUploader = require("../config/youtube");
 const provider = require("../services/liveSessionProviderService");
 const { publicSession, ownerSession } = require("../utils/liveSessionPresentation");
+const { ensureAffiliateAccount } = require("../services/affiliate.service");
 
 const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
 const owns = (session, user) => isAdmin(user) || session.tutorId === user.id;
@@ -104,6 +105,26 @@ async function getMyLiveSessions(req, res, next) {
     if (req.query.upcoming === "true") where.scheduledEndTime = { [Op.gt]: new Date() };
     const rows = await LiveSession.findAll({ where, include: [...includes, { model: LiveSessionMeeting, as: "meeting" }], order: [["scheduledStartTime", "ASC"]] });
     res.json({ success: true, data: { sessions: rows.map(ownerSession) } });
+  } catch (error) { next(error); }
+}
+
+async function getLiveSessionReferralLink(req, res, next) {
+  try {
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!owns(session, req.user)) return res.status(403).json({ success: false, message: "Not authorized to share this session" });
+    if (["cancelled", "ended", "recorded"].includes(session.status)) {
+      return res.status(400).json({ success: false, message: "This session can no longer be shared" });
+    }
+
+    const account = await ensureAffiliateAccount(session.tutorId);
+    if (!account) {
+      return res.status(403).json({ success: false, message: "An approved, verified tutor profile is required to create referral invites" });
+    }
+
+    const coreAppUrl = (process.env.CORE_APP_URL || "https://unihub.lk").replace(/\/+$/, "");
+    const inviteUrl = `${coreAppUrl}/auth/register?ref=${encodeURIComponent(account.referralCode)}&liveSession=${session.id}`;
+    return res.json({ success: true, data: { inviteUrl, referralCode: account.referralCode, sessionId: session.id } });
   } catch (error) { next(error); }
 }
 
@@ -218,4 +239,4 @@ async function setMeetingIdentity(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, getMeetingIdentity, setMeetingIdentity };
+module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, getMeetingIdentity, setMeetingIdentity };
