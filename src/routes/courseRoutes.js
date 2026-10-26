@@ -7,6 +7,7 @@ const {
   updateCourse,
   deleteCourse,
   getMyCourses,
+  getTutorDashboard,
   submitForReview,
 } = require("../controllers/courseController");
 const { authMiddleware, optionalAuthMiddleware, authorize } = require("../middleware/auth");
@@ -135,6 +136,13 @@ router.get(
   authMiddleware,
   authorize("tutor", "admin"),
   getMyCourses
+);
+
+router.get(
+  "/dashboard",
+  authMiddleware,
+  authorize("tutor", "admin"),
+  getTutorDashboard
 );
 
 /**

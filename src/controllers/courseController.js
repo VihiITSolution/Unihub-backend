@@ -490,6 +490,126 @@ const getMyCourses = async (req, res, next) => {
   }
 };
 
+// The dashboard reads the source records rather than course counters, which
+// can lag behind an enrollment, review, or payment.
+const getTutorDashboard = async (req, res, next) => {
+  try {
+    const courses = await Course.findAll({
+      where: { tutorId: req.user.id },
+      include: [
+        { model: User, as: "approver", attributes: ["id", "firstName", "lastName", "email"], required: false },
+        { model: require("../models/Faculty"), as: "faculty", attributes: ["id", "name", "icon", "description"], required: false },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+    const courseIds = courses.map((course) => course.id);
+    if (!courseIds.length) {
+      return res.json({ success: true, data: { courses: [], stats: { totalCourses: 0, totalStudents: 0, averageRating: 0, totalRevenue: 0 }, activities: [] } });
+    }
+
+    const [enrollments, reviews, payments] = await Promise.all([
+      Enrollment.findAll({
+        where: { courseId: { [Op.in]: courseIds } },
+        include: [
+          { model: User, as: "learner", attributes: ["id", "firstName", "lastName"], required: false },
+          { model: Course, as: "course", attributes: ["id", "title"], required: false },
+        ],
+      }),
+      Review.findAll({
+        where: { courseId: { [Op.in]: courseIds } },
+        include: [
+          { model: User, as: "user", attributes: ["id", "firstName", "lastName"], required: false },
+          { model: Course, as: "course", attributes: ["id", "title"], required: false },
+        ],
+      }),
+      Payment.findAll({
+        where: { status: "completed" },
+        include: [{
+          model: Enrollment,
+          as: "enrollment",
+          required: true,
+          where: { courseId: { [Op.in]: courseIds } },
+          include: [{ model: Course, as: "course", attributes: ["id", "title"], required: false }],
+        }],
+      }),
+    ]);
+
+    const enrollmentCounts = new Map();
+    const reviewTotals = new Map();
+    for (const enrollment of enrollments) {
+      if (enrollment.status !== "cancelled") {
+        enrollmentCounts.set(enrollment.courseId, (enrollmentCounts.get(enrollment.courseId) || 0) + 1);
+      }
+    }
+    for (const review of reviews) {
+      const current = reviewTotals.get(review.courseId) || { total: 0, count: 0 };
+      reviewTotals.set(review.courseId, { total: current.total + Number(review.rating || 0), count: current.count + 1 });
+    }
+
+    const hydratedCourses = courses.map((courseRecord) => {
+      const course = courseRecord.toJSON();
+      const reviewSummary = reviewTotals.get(course.id) || { total: 0, count: 0 };
+      const enrolledCount = enrollmentCounts.get(course.id) || 0;
+      return {
+        ...course,
+        enrolledCount,
+        enrollmentCount: enrolledCount,
+        rating: reviewSummary.count ? Number((reviewSummary.total / reviewSummary.count).toFixed(2)) : 0,
+        reviewCount: reviewSummary.count,
+      };
+    });
+
+    const activities = [
+      ...enrollments.map((enrollment) => ({
+        id: `enrollment-${enrollment.id}`,
+        type: "enrollment",
+        title: "New enrollment",
+        description: `${enrollment.learner ? `${enrollment.learner.firstName} ${enrollment.learner.lastName}` : "A student"} enrolled in “${enrollment.course?.title || "your course"}”`,
+        occurredAt: enrollment.enrolledAt || enrollment.createdAt,
+      })),
+      ...reviews.map((review) => ({
+        id: `review-${review.id}`,
+        type: "review",
+        title: "New review",
+        description: `${review.rating}-star review on “${review.course?.title || "your course"}”`,
+        occurredAt: review.createdAt,
+      })),
+      ...payments.map((payment) => ({
+        id: `payment-${payment.id}`,
+        type: "payment",
+        title: "Payment received",
+        description: `Earned LKR ${Number(payment.amount || 0).toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from “${payment.enrollment?.course?.title || "a course enrollment"}”`,
+        occurredAt: payment.paidAt || payment.createdAt,
+      })),
+    ]
+      .filter((activity) => activity.occurredAt)
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+      .slice(0, 10);
+
+    const activeEnrollments = enrollments.filter((enrollment) => enrollment.status !== "cancelled");
+    const averageRating = reviews.length
+      ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+      : 0;
+    const totalRevenue = payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        courses: hydratedCourses,
+        stats: {
+          totalCourses: courses.length,
+          totalStudents: activeEnrollments.length,
+          averageRating: Number(averageRating.toFixed(1)),
+          totalRevenue: Number(totalRevenue.toFixed(2)),
+        },
+        activities,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * Submit course for review (Tutor only)
  * Changes course status from 'draft' to 'pending'
@@ -566,5 +686,6 @@ module.exports = {
   updateCourse,
   deleteCourse,
   getMyCourses,
+  getTutorDashboard,
   submitForReview,
 };
