@@ -504,7 +504,7 @@ const getTutorDashboard = async (req, res, next) => {
     });
     const courseIds = courses.map((course) => course.id);
     if (!courseIds.length) {
-      return res.json({ success: true, data: { courses: [], stats: { totalCourses: 0, totalStudents: 0, averageRating: 0, totalRevenue: 0 }, activities: [] } });
+      return res.json({ success: true, data: { courses: [], stats: { totalCourses: 0, totalStudents: 0, averageRating: 0, totalRevenue: 0 }, recentReviews: [], activities: [] } });
     }
 
     const [enrollments, reviews, payments] = await Promise.all([
@@ -586,6 +586,19 @@ const getTutorDashboard = async (req, res, next) => {
       .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
       .slice(0, 10);
 
+    const recentReviews = [...reviews]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 6)
+      .map((review) => ({
+        id: String(review.id),
+        courseId: String(review.courseId),
+        courseTitle: review.course?.title || "Your course",
+        studentName: review.user ? `${review.user.firstName} ${review.user.lastName}` : "Student",
+        rating: Number(review.rating),
+        comment: review.comment || "No written comment provided.",
+        createdAt: review.createdAt,
+      }));
+
     const activeEnrollments = enrollments.filter((enrollment) => enrollment.status !== "cancelled");
     const averageRating = reviews.length
       ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
@@ -602,6 +615,7 @@ const getTutorDashboard = async (req, res, next) => {
           averageRating: Number(averageRating.toFixed(1)),
           totalRevenue: Number(totalRevenue.toFixed(2)),
         },
+        recentReviews,
         activities,
       },
     });
