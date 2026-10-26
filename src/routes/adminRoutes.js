@@ -11,6 +11,7 @@ const {
   approveCourse,
   rejectCourse,
   getCourseDetails,
+  importCourseContentFromOneDrive,
   getPendingMarketplaceItems,
   approveMarketplaceItem,
   rejectMarketplaceItem,
@@ -239,6 +240,14 @@ router.get(
   authMiddleware,
   authorize("admin"),
   getCourseDetails,
+);
+
+router.post(
+  "/courses/:id/content/import-onedrive",
+  authMiddleware,
+  authorize("admin"),
+  auditAdminAction("course_content.onedrive_imported", "course_content", "Imported course content from OneDrive"),
+  importCourseContentFromOneDrive,
 );
 
 /**

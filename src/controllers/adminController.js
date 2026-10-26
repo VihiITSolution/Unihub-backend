@@ -22,6 +22,19 @@ const { createNotification } = require("./notificationController");
 const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
 const { ensureAffiliateAccount, recordApprovedActivity, recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
+const youtubeUploader = require("../config/youtube");
+const { downloadPublicOneDriveVideo } = require("../services/oneDriveImport.service");
+const fs = require("fs");
+
+const getYouTubeVideoId = (url = "") => {
+  const match = String(url).match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match?.[1] || null;
+};
+
+const buildPrivacyEmbedUrl = (videoId) =>
+  videoId
+    ? `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0`
+    : null;
 
 /**
  * Get all users (Admin only)
@@ -666,6 +679,70 @@ const getCourseDetails = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * Import a public OneDrive video into a course (Admin only).
+ * The file is downloaded only to the server's temporary import directory,
+ * uploaded to UniHub's YouTube channel, and removed immediately afterwards.
+ */
+const importCourseContentFromOneDrive = async (req, res, next) => {
+  let importedFilePath = null;
+
+  try {
+    const { id } = req.params;
+    const { oneDriveUrl, title, duration, order, isPreview } = req.body || {};
+    const normalizedTitle = String(title || "").trim();
+    const normalizedOrder = Number(order ?? 0);
+    const normalizedDuration = duration === undefined || duration === "" ? null : Number(duration);
+
+    if (!normalizedTitle || normalizedTitle.length > 255) {
+      return res.status(400).json({ success: false, message: "A material title of up to 255 characters is required." });
+    }
+    if (!Number.isInteger(normalizedOrder) || normalizedOrder < 0) {
+      return res.status(400).json({ success: false, message: "Display order must be zero or a positive whole number." });
+    }
+    if (normalizedDuration !== null && (!Number.isInteger(normalizedDuration) || normalizedDuration <= 0)) {
+      return res.status(400).json({ success: false, message: "Duration must be a positive whole number of minutes." });
+    }
+
+    const course = await Course.findByPk(id);
+    if (!course) {
+      return res.status(404).json({ success: false, message: "Course not found" });
+    }
+
+    const downloaded = await downloadPublicOneDriveVideo(oneDriveUrl);
+    importedFilePath = downloaded.filePath;
+    const youtubeUrl = await youtubeUploader.uploadVideo(
+      importedFilePath,
+      `${normalizedTitle} - Course ${course.id}`,
+      `Course lesson: ${normalizedTitle}`,
+    );
+    const youtubeVideoId = getYouTubeVideoId(youtubeUrl);
+    const content = await CourseContent.create({
+      courseId: course.id,
+      title: normalizedTitle,
+      type: "video",
+      url: buildPrivacyEmbedUrl(youtubeVideoId) || youtubeUrl,
+      youtubeVideoId,
+      duration: normalizedDuration,
+      order: normalizedOrder,
+      isPreview: isPreview === true || isPreview === "true",
+    });
+
+    await recordQualifyingVideoActivity(course, content);
+    return res.status(201).json({
+      success: true,
+      message: "OneDrive video imported and added to the course successfully.",
+      data: { content },
+    });
+  } catch (error) {
+    return next(error);
+  } finally {
+    if (importedFilePath) {
+      try { fs.unlinkSync(importedFilePath); } catch {}
+    }
   }
 };
 
@@ -1516,6 +1593,7 @@ module.exports = {
   approveCourse,
   rejectCourse,
   getCourseDetails,
+  importCourseContentFromOneDrive,
   getPendingMarketplaceItems,
   approveMarketplaceItem,
   rejectMarketplaceItem,
