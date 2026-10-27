@@ -63,6 +63,8 @@ router.post(
     const type = String(req.query?.type || req.body?.type || "").toLowerCase();
     if (type === "pdf") {
       uploadPDF(req, res, next);
+    } else if (type === "link") {
+      next();
     } else {
       uploadVideo(req, res, next);
     }
@@ -70,8 +72,8 @@ router.post(
   [
     body("title").trim().notEmpty().withMessage("Title is required"),
     body("type")
-      .isIn(["video", "pdf"])
-      .withMessage("Type must be video or pdf"),
+      .isIn(["video", "pdf", "link"])
+      .withMessage("Type must be video, pdf, or link"),
     validate,
   ],
   addCourseContent,
