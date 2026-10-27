@@ -32,6 +32,21 @@ const buildPrivacyEmbedUrl = (videoId) => {
   return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0`;
 };
 
+// Support materials are opened in the learner's browser, so accept only
+// ordinary public web URLs. This blocks javascript:, data:, and local paths.
+const normalizePublicResourceUrl = (value) => {
+  let url;
+  try {
+    url = new URL(String(value || "").trim());
+  } catch {
+    return null;
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.href.length > 500) {
+    return null;
+  }
+  return url.toString();
+};
+
 const sanitizeContentForClient = (content) => {
   const raw = content?.toJSON ? content.toJSON() : content;
   if (!raw) return raw;
@@ -96,10 +111,10 @@ const addCourseContent = async (req, res, next) => {
     }
 
     // Validate type value
-    if (type !== "video" && type !== "pdf") {
+    if (!["video", "pdf", "link"].includes(type)) {
       return res.status(400).json({
         success: false,
-        message: "Type must be either 'video' or 'pdf'",
+        message: "Type must be 'video', 'pdf', or 'link'",
       });
     }
 
@@ -125,7 +140,15 @@ const addCourseContent = async (req, res, next) => {
     let youtubeRightsDeclarationId = null;
     let youtubeRightsConfirmedAt = null;
 
-    if (type === "video" && req.file) {
+    if (type === "link") {
+      url = normalizePublicResourceUrl(req.body.url);
+      if (!url) {
+        return res.status(400).json({
+          success: false,
+          message: "Enter a valid public http(s) support-material link.",
+        });
+      }
+    } else if (type === "video" && req.file) {
       // Staff may upload a tutor's supplied material while moderating the course.
       // A tutor declaration remains required for tutor-initiated uploads and
       // externally linked YouTube videos, but must not block an admin upload.
@@ -367,7 +390,16 @@ const updateCourseContent = async (req, res, next) => {
     }
 
     if (url !== undefined) {
-      if (content.type !== "video") {
+      if (content.type === "link") {
+        const normalizedUrl = normalizePublicResourceUrl(url);
+        if (!normalizedUrl) {
+          return res.status(400).json({
+            success: false,
+            message: "Enter a valid public http(s) support-material link.",
+          });
+        }
+        content.url = normalizedUrl;
+      } else if (content.type !== "video") {
         return res.status(400).json({
           success: false,
           message: "A PDF file cannot be replaced from the material details editor.",

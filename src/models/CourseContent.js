@@ -23,7 +23,7 @@ const CourseContent = sequelize.define(
       allowNull: false,
     },
     type: {
-      type: DataTypes.ENUM("video", "pdf"),
+      type: DataTypes.ENUM("video", "pdf", "link"),
       allowNull: false,
     },
     url: {
