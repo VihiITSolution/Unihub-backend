@@ -10,6 +10,12 @@ const maxImportBytes = Number(process.env.ONEDRIVE_IMPORT_MAX_BYTES) || 5 * 1024
 
 if (!fs.existsSync(importsDir)) fs.mkdirSync(importsDir, { recursive: true });
 
+const importError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
 const isOneDriveHost = (hostname) => {
   const host = hostname.toLowerCase();
   return (
@@ -29,7 +35,18 @@ const normalizeOneDriveUrl = (value) => {
   }
 
   if (url.protocol !== "https:" || !isOneDriveHost(url.hostname)) {
-    throw new Error("Only public OneDrive or SharePoint sharing links are supported.");
+    throw importError("Only public OneDrive or SharePoint sharing links are supported.");
+  }
+
+  // A Stream player URL is a web page which uses the tutor's Microsoft browser
+  // session. It is not a file-sharing URL, so a server cannot download it.
+  if (
+    url.hostname.toLowerCase().endsWith(".sharepoint.com") &&
+    url.pathname.toLowerCase().includes("/_layouts/15/stream.aspx")
+  ) {
+    throw importError(
+      "This is a SharePoint Stream player link, not a downloadable file link. In OneDrive or SharePoint, select the MP4, choose Share > Copy link, set it to 'Anyone with the link' (with download allowed), then paste that new sharing link.",
+    );
   }
 
   // OneDrive honours this for standard share links. Short 1drv.ms links are
@@ -47,26 +64,42 @@ const filenameFromHeaders = (headers) => {
 };
 
 const downloadPublicOneDriveVideo = async (sharingUrl) => {
-  const response = await axios.get(normalizeOneDriveUrl(sharingUrl), {
-    responseType: "stream",
-    maxRedirects: 5,
-    timeout: 30_000,
-    maxContentLength: maxImportBytes,
-    maxBodyLength: maxImportBytes,
-    headers: { "User-Agent": "UniHub course importer" },
-    validateStatus: (status) => status >= 200 && status < 300,
-  });
+  let response;
+  try {
+    response = await axios.get(normalizeOneDriveUrl(sharingUrl), {
+      responseType: "stream",
+      maxRedirects: 5,
+      timeout: 30_000,
+      maxContentLength: maxImportBytes,
+      maxBodyLength: maxImportBytes,
+      headers: { "User-Agent": "UniHub course importer" },
+      validateStatus: (status) => status >= 200 && status < 300,
+    });
+  } catch (error) {
+    if (error.statusCode) throw error;
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      throw importError("OneDrive denied access to this file. Use a sharing link that allows anyone with the link to view and download the video.");
+    }
+    if (status === 404) {
+      throw importError("The OneDrive video could not be found. Check that the sharing link is complete and has not expired.");
+    }
+    if (error.code === "ECONNABORTED") {
+      throw importError("The OneDrive download timed out. Try again, or use a smaller video file.", 504);
+    }
+    throw importError("UniHub could not download this OneDrive file. Check that it is a public, downloadable video sharing link.", 502);
+  }
 
   const contentType = String(response.headers["content-type"] || "").toLowerCase();
   if (contentType.includes("text/html")) {
     response.data.destroy();
-    throw new Error("This OneDrive link did not return a downloadable file. Ask the tutor to share it with download access.");
+    throw importError("This OneDrive link opened a web page instead of the video file. Use Share > Copy link for the MP4 and allow downloads.");
   }
 
   const contentLength = Number(response.headers["content-length"] || 0);
   if (contentLength > maxImportBytes) {
     response.data.destroy();
-    throw new Error("The OneDrive video exceeds the import size limit.");
+    throw importError("The OneDrive video exceeds the import size limit.");
   }
 
   const originalName = filenameFromHeaders(response.headers);
@@ -77,7 +110,7 @@ const downloadPublicOneDriveVideo = async (sharingUrl) => {
     transform(chunk, _encoding, callback) {
       downloadedBytes += chunk.length;
       if (downloadedBytes > maxImportBytes) {
-        callback(new Error("The OneDrive video exceeds the import size limit."));
+        callback(importError("The OneDrive video exceeds the import size limit."));
         return;
       }
       callback(null, chunk);
