@@ -6,6 +6,8 @@ const {
 } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const { recordQualifyingVideoActivity } = require("../services/affiliate.service");
+const { syncCourseDuration } = require("../services/courseDuration.service");
+const { storeSupportLink, readSupportLink, presentCourseContent } = require("../services/courseSupportMaterial.service");
 const path = require("path");
 const fs = require("fs");
 
@@ -41,14 +43,14 @@ const normalizePublicResourceUrl = (value) => {
   } catch {
     return null;
   }
-  if (!['http:', 'https:'].includes(url.protocol) || url.href.length > 500) {
+  if (!['http:', 'https:'].includes(url.protocol) || url.href.length > 470) {
     return null;
   }
   return url.toString();
 };
 
 const sanitizeContentForClient = (content) => {
-  const raw = content?.toJSON ? content.toJSON() : content;
+  const raw = presentCourseContent(content);
   if (!raw) return raw;
 
   if (raw.type === "video") {
@@ -136,18 +138,21 @@ const addCourseContent = async (req, res, next) => {
     }
 
     let url;
+    let storedType = type;
     let youtubeVideoId = null;
     let youtubeRightsDeclarationId = null;
     let youtubeRightsConfirmedAt = null;
 
     if (type === "link") {
-      url = normalizePublicResourceUrl(req.body.url);
-      if (!url) {
+      const publicUrl = normalizePublicResourceUrl(req.body.url);
+      if (!publicUrl) {
         return res.status(400).json({
           success: false,
           message: "Enter a valid public http(s) support-material link.",
         });
       }
+      url = storeSupportLink(publicUrl);
+      storedType = "pdf";
     } else if (type === "video" && req.file) {
       // Staff may upload a tutor's supplied material while moderating the course.
       // A tutor declaration remains required for tutor-initiated uploads and
@@ -249,7 +254,7 @@ const addCourseContent = async (req, res, next) => {
     const content = await CourseContent.create({
       courseId,
       title,
-      type,
+      type: storedType,
       url,
       youtubeVideoId,
       youtubeRightsDeclarationId,
@@ -259,6 +264,7 @@ const addCourseContent = async (req, res, next) => {
       isPreview: isPreview === "true" || isPreview === true ? true : false,
     });
     await recordQualifyingVideoActivity(course, content);
+    await syncCourseDuration(course.id);
 
     res.status(201).json({
       success: true,
@@ -390,7 +396,7 @@ const updateCourseContent = async (req, res, next) => {
     }
 
     if (url !== undefined) {
-      if (content.type === "link") {
+      if (readSupportLink(content.url)) {
         const normalizedUrl = normalizePublicResourceUrl(url);
         if (!normalizedUrl) {
           return res.status(400).json({
@@ -398,45 +404,47 @@ const updateCourseContent = async (req, res, next) => {
             message: "Enter a valid public http(s) support-material link.",
           });
         }
-        content.url = normalizedUrl;
-      } else if (content.type !== "video") {
-        return res.status(400).json({
-          success: false,
-          message: "A PDF file cannot be replaced from the material details editor.",
-        });
-      }
+        content.url = storeSupportLink(normalizedUrl);
+      } else {
+        if (content.type !== "video") {
+          return res.status(400).json({
+            success: false,
+            message: "A PDF file cannot be replaced from the material details editor.",
+          });
+        }
 
-      const videoId = extractYouTubeVideoId(String(url).trim());
-      if (!videoId) {
-        return res.status(400).json({
-          success: false,
-          message: "Only valid YouTube links can be used for video materials.",
-        });
-      }
+        const videoId = extractYouTubeVideoId(String(url).trim());
+        if (!videoId) {
+          return res.status(400).json({
+            success: false,
+            message: "Only valid YouTube links can be used for video materials.",
+          });
+        }
 
-      const rightsConfirmed = parseBoolean(req.body.youtubeRightsConfirmed);
-      if (rightsConfirmed !== true) {
-        return res.status(400).json({
-          success: false,
-          message: "Confirm that this YouTube link is covered by the tutor's signed rights declaration.",
-        });
-      }
+        const rightsConfirmed = parseBoolean(req.body.youtubeRightsConfirmed);
+        if (rightsConfirmed !== true) {
+          return res.status(400).json({
+            success: false,
+            message: "Confirm that this YouTube link is covered by the tutor's signed rights declaration.",
+          });
+        }
 
-      const declaration = await YouTubeRightsDeclaration.findOne({
-        where: { userId: course.tutorId },
-      });
-      if (!declaration) {
-        return res.status(428).json({
-          success: false,
-          code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
-          message: "Sign the YouTube rights declaration before changing an externally hosted video.",
+        const declaration = await YouTubeRightsDeclaration.findOne({
+          where: { userId: course.tutorId },
         });
-      }
+        if (!declaration) {
+          return res.status(428).json({
+            success: false,
+            code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
+            message: "Sign the YouTube rights declaration before changing an externally hosted video.",
+          });
+        }
 
-      content.url = buildPrivacyEmbedUrl(videoId);
-      content.youtubeVideoId = videoId;
-      content.youtubeRightsDeclarationId = declaration.id;
-      content.youtubeRightsConfirmedAt = new Date();
+        content.url = buildPrivacyEmbedUrl(videoId);
+        content.youtubeVideoId = videoId;
+        content.youtubeRightsDeclarationId = declaration.id;
+        content.youtubeRightsConfirmedAt = new Date();
+      }
     }
 
     if (isPublished !== undefined) {
@@ -463,6 +471,7 @@ const updateCourseContent = async (req, res, next) => {
 
     await content.save();
     await recordQualifyingVideoActivity(course, content);
+    await syncCourseDuration(course.id);
 
     res.status(200).json({
       success: true,
@@ -489,9 +498,10 @@ const deleteCourseContent = async (req, res, next) => {
       });
     }
 
-    const { content } = managed;
+    const { content, course } = managed;
 
     await content.destroy();
+    await syncCourseDuration(course.id);
 
     res.status(200).json({
       success: true,

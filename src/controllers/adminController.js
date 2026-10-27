@@ -24,6 +24,8 @@ const { ensureAffiliateAccount, recordApprovedActivity, recordQualifyingVideoAct
 const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 const youtubeUploader = require("../config/youtube");
 const { downloadPublicOneDriveVideo } = require("../services/oneDriveImport.service");
+const { syncCourseDuration } = require("../services/courseDuration.service");
+const { presentCourseContent } = require("../services/courseSupportMaterial.service");
 const fs = require("fs");
 
 const getYouTubeVideoId = (url = "") => {
@@ -673,7 +675,7 @@ const getCourseDetails = async (req, res, next) => {
           ...course.toJSON(),
           enrollmentCount,
         },
-        courseContent,
+        courseContent: courseContent.map(presentCourseContent),
         youtubeRightsDeclaration,
       },
     });
@@ -732,6 +734,7 @@ const importCourseContentFromOneDrive = async (req, res, next) => {
     });
 
     await recordQualifyingVideoActivity(course, content);
+    await syncCourseDuration(course.id);
     return res.status(201).json({
       success: true,
       message: "OneDrive video imported and added to the course successfully.",

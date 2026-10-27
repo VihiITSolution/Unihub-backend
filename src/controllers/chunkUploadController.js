@@ -4,6 +4,7 @@ const multer = require("multer");
 const { CourseContent, Course, YouTubeRightsDeclaration } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const { recordQualifyingVideoActivity } = require("../services/affiliate.service");
+const { syncCourseDuration } = require("../services/courseDuration.service");
 
 const uploadsDir = path.join(__dirname, "../../uploads");
 const chunksBaseDir = path.join(uploadsDir, "chunks");
@@ -143,6 +144,7 @@ const completeChunkedUpload = async (req, res, next) => {
       isPreview: isPreview === "true" || isPreview === true,
     });
     await recordQualifyingVideoActivity(course, content);
+    await syncCourseDuration(course.id);
 
     res.status(201).json({ success: true, message: "Course content added successfully", data: { content } });
   } catch (error) {
