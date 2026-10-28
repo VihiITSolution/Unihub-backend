@@ -36,6 +36,7 @@ const UserMeetingIdentity = require("./UserMeetingIdentity");
 const LiveSessionProviderJob = require("./LiveSessionProviderJob");
 const LiveSessionEvent = require("./LiveSessionEvent");
 const VerificationChallenge = require("./VerificationChallenge");
+const MicrosoftDriveConnection = require("./MicrosoftDriveConnection");
 const AffiliateCampaign = require("./AffiliateCampaign");
 const AffiliateAccount = require("./AffiliateAccount");
 const AffiliateReferral = require("./AffiliateReferral");
@@ -49,6 +50,8 @@ User.hasOne(StudentProfile, { foreignKey: "userId", as: "studentProfile" });
 StudentProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
 User.hasMany(VerificationChallenge, { foreignKey: "userId", as: "verificationChallenges" });
 VerificationChallenge.belongsTo(User, { foreignKey: "userId", as: "user" });
+User.hasOne(MicrosoftDriveConnection, { foreignKey: "userId", as: "microsoftDriveConnection" });
+MicrosoftDriveConnection.belongsTo(User, { foreignKey: "userId", as: "user" });
 
 User.hasOne(TutorProfile, { foreignKey: "userId", as: "tutorProfile" });
 TutorProfile.belongsTo(User, { foreignKey: "userId", as: "user" });
@@ -395,6 +398,7 @@ module.exports = {
   YouTubeRightsDeclaration,
   AdminAuditLog,
   VerificationChallenge,
+  MicrosoftDriveConnection,
   AffiliateCampaign,
   AffiliateAccount,
   AffiliateReferral,
