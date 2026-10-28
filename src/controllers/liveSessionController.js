@@ -16,6 +16,7 @@ const includes = [
 function referralInviteSession(session, tutor) {
   return {
     id: session.id,
+    tutorId: session.tutorId,
     title: session.title,
     description: session.description,
     scheduledStartTime: session.scheduledStartTime,
