@@ -9,7 +9,7 @@
  * 3. Run this script: node authorize-youtube.js
  * 4. Browser will open - sign in with UniHub YouTube account
  * 5. Click "Allow"
- * 6. Done! Token will be saved automatically kk
+ * 6. Done! Token will be saved automatically 
  */
 
 async function authorizeYouTube() {

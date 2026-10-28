@@ -21,6 +21,7 @@ router.get('/mine', authMiddleware, authorize('tutor', 'admin'), liveSessionCont
 router.get('/meeting-identity', authMiddleware, liveSessionController.getMeetingIdentity);
 router.post('/meeting-identity', authMiddleware, liveSessionController.setMeetingIdentity);
 router.get('/:id/referral-link', authMiddleware, authorize('tutor', 'admin'), liveSessionController.getLiveSessionReferralLink);
+router.get('/:id/referral-invite', liveSessionController.getLiveSessionReferralInvite);
 
 router.get(
   '/:id',

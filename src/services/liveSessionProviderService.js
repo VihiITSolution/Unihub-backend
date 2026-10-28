@@ -110,9 +110,24 @@ async function checkOrganizerHealth() {
   if (!organizer) return { configured: false, enabled: enabled(), healthy: false, message: "TEAMS_ORGANIZER_EMAIL is not configured" };
   try {
     const remote = await graph.getOrganizer(organizer.entraUserId || organizer.email);
-    const quota = await graph.getDriveQuota(organizer.entraUserId || organizer.email);
+    // A mailbox/calendar is required to create a Teams meeting. OneDrive is
+    // only required later when we import or share a recording. A new Microsoft
+    // user can have a valid mailbox before their personal OneDrive site exists,
+    // so do not reject an otherwise valid session approval for that condition.
+    let quota = null;
+    let storageWarning = null;
+    try {
+      quota = await graph.getDriveQuota(organizer.entraUserId || organizer.email);
+    } catch (error) {
+      storageWarning = sanitize(error);
+    }
     await organizer.update({ entraUserId: remote.id, healthStatus: "healthy", lastHealthCheckAt: new Date(), healthMessage: null });
-    return { configured: graph.configured(), enabled: enabled(), healthy: true, organizerEmail: organizer.email, quota };
+    return {
+      configured: graph.configured(), enabled: enabled(), healthy: true,
+      organizerEmail: organizer.email, quota,
+      recordingStorageAvailable: !storageWarning,
+      storageWarning,
+    };
   } catch (error) {
     const message = sanitize(error);
     await organizer.update({ healthStatus: "unhealthy", lastHealthCheckAt: new Date(), healthMessage: message });

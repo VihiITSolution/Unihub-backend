@@ -3,7 +3,8 @@ const { sequelize, LiveSession, User, Course, TutorProfile, LiveSessionMeeting, 
 const youtubeUploader = require("../config/youtube");
 const provider = require("../services/liveSessionProviderService");
 const { publicSession, ownerSession } = require("../utils/liveSessionPresentation");
-const { ensureAffiliateAccount } = require("../services/affiliate.service");
+const { ensureAffiliateAccount, validateReferralCode } = require("../services/affiliate.service");
+const { validateLiveSessionReferralInvite } = require("../services/liveSessionReferral.service");
 
 const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
 const owns = (session, user) => isAdmin(user) || session.tutorId === user.id;
@@ -11,6 +12,38 @@ const includes = [
   { model: User, as: "tutor", attributes: ["id", "firstName", "lastName", "email", "profileImage"] },
   { model: Course, as: "course", attributes: ["id", "title", "thumbnail"] },
 ];
+
+function referralInviteSession(session, tutor) {
+  return {
+    id: session.id,
+    title: session.title,
+    description: session.description,
+    scheduledStartTime: session.scheduledStartTime,
+    scheduledEndTime: session.scheduledEndTime,
+    isFree: session.isFree,
+    status: session.status,
+    approvalStatus: session.approvalStatus,
+    tutorName: [tutor?.firstName, tutor?.lastName].filter(Boolean).join(" ") || "your UniHub tutor",
+  };
+}
+
+function referralInviteMessage(session, tutor, inviteUrl) {
+  const details = referralInviteSession(session, tutor);
+  const schedule = new Intl.DateTimeFormat("en-LK", {
+    dateStyle: "full", timeStyle: "short", timeZone: "Asia/Colombo",
+  }).format(new Date(details.scheduledStartTime));
+  const availability = details.approvalStatus === "approved"
+    ? "Register through this link to reserve your free place and join the session."
+    : "Register through this link to reserve your free place. We’ll let you know once the session is confirmed.";
+  return [
+    `Join me for “${details.title}” on UniHub!`,
+    `Hosted by ${details.tutorName}`,
+    `When: ${schedule} (Sri Lanka time)`,
+    details.description || null,
+    availability,
+    inviteUrl,
+  ].filter(Boolean).join("\n");
+}
 
 function schedule(body, existing) {
   const startTime = new Date(body.scheduledStartTime || existing?.scheduledStartTime);
@@ -124,8 +157,32 @@ async function getLiveSessionReferralLink(req, res, next) {
 
     const coreAppUrl = (process.env.CORE_APP_URL || "https://unihub.lk").replace(/\/+$/, "");
     const inviteUrl = `${coreAppUrl}/auth/register?ref=${encodeURIComponent(account.referralCode)}&liveSession=${session.id}`;
-    return res.json({ success: true, data: { inviteUrl, referralCode: account.referralCode, sessionId: session.id } });
+    const tutor = await User.findByPk(session.tutorId, { attributes: ["firstName", "lastName"] });
+    return res.json({
+      success: true,
+      data: {
+        inviteUrl,
+        referralCode: account.referralCode,
+        sessionId: session.id,
+        session: referralInviteSession(session, tutor),
+        shareMessage: referralInviteMessage(session, tutor, inviteUrl),
+      },
+    });
   } catch (error) { next(error); }
+}
+
+async function getLiveSessionReferralInvite(req, res, next) {
+  try {
+    const referral = await validateReferralCode(req.query.ref);
+    const session = await validateLiveSessionReferralInvite({
+      sessionId: req.params.id,
+      referrerUserId: referral.account.userId,
+    });
+    const tutor = await User.findByPk(session.tutorId, { attributes: ["firstName", "lastName"] });
+    res.json({ success: true, data: { session: referralInviteSession(session, tutor) } });
+  } catch (error) {
+    res.status(404).json({ success: false, message: "This live-session invitation is invalid or no longer available." });
+  }
 }
 
 async function getLiveSession(req, res, next) {
@@ -239,4 +296,4 @@ async function setMeetingIdentity(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, getMeetingIdentity, setMeetingIdentity };
+module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, getLiveSessionReferralInvite, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, getMeetingIdentity, setMeetingIdentity };
