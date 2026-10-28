@@ -2,6 +2,8 @@ const { Op } = require("sequelize");
 const { sequelize, SessionEnrollment, LiveSession, LiveSessionMeeting, User } = require("../models");
 const provider = require("../services/liveSessionProviderService");
 const { publicSession } = require("../utils/liveSessionPresentation");
+const { validateReferralCode } = require("../services/affiliate.service");
+const { validateLiveSessionReferralInvite, enrollReferralStudentInLiveSession } = require("../services/liveSessionReferral.service");
 
 const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
 
@@ -35,6 +37,37 @@ async function enrollInSession(req, res, next) {
       success: true,
       message: identity?.invitationStatus === "accepted" ? "Enrolled successfully" : "Enrolled. Accept the Microsoft invitation before joining.",
       data: { enrollment, identity: identity ? { email: identity.email, invitationStatus: identity.invitationStatus, invitationRedeemUrl: identity.invitationRedeemUrl } : null },
+    });
+  } catch (error) { next(error); }
+}
+
+async function enrollFromReferralInvite(req, res, next) {
+  try {
+    if (!req.user.isVerified) return res.status(403).json({ success: false, message: "Verify your UniHub email before enrolling in a Teams session" });
+    const referral = await validateReferralCode(req.query.ref);
+    if (referral.account.userId === req.user.id) return res.status(400).json({ success: false, message: "You cannot use your own live-session referral invitation" });
+    const session = await validateLiveSessionReferralInvite({
+      sessionId: req.params.id,
+      referrerUserId: referral.account.userId,
+    });
+    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, req.user.email) : null;
+    const result = await sequelize.transaction((transaction) => enrollReferralStudentInLiveSession({
+      sessionId: session.id,
+      referrerUserId: referral.account.userId,
+      studentId: req.user.id,
+      transaction,
+    }));
+    if (result.session.provider === "teams" && result.session.providerStatus === "ready") {
+      await provider.enqueue(result.session.id, "attendee_sync");
+    }
+    res.status(result.created ? 201 : 200).json({
+      success: true,
+      message: result.created ? "You are enrolled in this live session" : "You are already enrolled in this live session",
+      data: {
+        enrollment: result.enrollment,
+        session: publicSession(result.session),
+        identity: identity ? { email: identity.email, invitationStatus: identity.invitationStatus, invitationRedeemUrl: identity.invitationRedeemUrl } : null,
+      },
     });
   } catch (error) { next(error); }
 }
@@ -131,4 +164,4 @@ async function getSessionEnrollments(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { enrollInSession, inviteStudents, getMyEnrollments, joinSession, leaveSession, getSessionEnrollments };
+module.exports = { enrollInSession, enrollFromReferralInvite, inviteStudents, getMyEnrollments, joinSession, leaveSession, getSessionEnrollments };
