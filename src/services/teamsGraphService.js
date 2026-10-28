@@ -61,6 +61,20 @@ async function request(config, attempt = 0) {
 
 const userPath = (userIdOrEmail) => `/users/${encodeURIComponent(userIdOrEmail)}`;
 
+// Graph pages most collections. Follow @odata.nextLink so a session with more
+// attendees than one page still yields a complete attendance roster. nextLink is
+// an absolute URL, which axios uses in place of baseURL.
+async function collectAll(url, pageLimit = 50) {
+  const items = [];
+  let next = url;
+  for (let page = 0; next && page < pageLimit; page += 1) {
+    const response = await request({ method: "get", url: next });
+    items.push(...(response.data.value || []));
+    next = response.data["@odata.nextLink"] || null;
+  }
+  return items;
+}
+
 async function inviteGuest(email, displayName, redirectUrl) {
   const response = await request({
     method: "post",
@@ -165,23 +179,24 @@ async function configureOnlineMeeting(organizer, meetingId, presenterIdentity, a
 }
 
 async function listAttendanceReports(organizer, meetingId) {
-  const reports = await request({ method: "get", url: `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}/attendanceReports` });
+  const base = `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}/attendanceReports`;
+  const reports = await collectAll(base);
   const records = [];
-  for (const report of reports.data.value || []) {
-    const response = await request({ method: "get", url: `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}/attendanceReports/${encodeURIComponent(report.id)}/attendanceRecords` });
-    records.push(...(response.data.value || []));
+  for (const report of reports) {
+    records.push(...await collectAll(`${base}/${encodeURIComponent(report.id)}/attendanceRecords`));
   }
   return records;
 }
 
 async function listRecordings(organizer, meetingId) {
-  const response = await request({ method: "get", url: `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}/recordings` });
-  return response.data.value || [];
+  return collectAll(`${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}/recordings`);
 }
 
 async function searchOrganizerDrive(organizer, query) {
-  const response = await request({ method: "get", url: `${userPath(organizer)}/drive/root/search(q='${encodeURIComponent(query)}')` });
-  return response.data.value || [];
+  // Inside an OData string literal a single quote is escaped by doubling it.
+  // encodeURIComponent does not touch quotes, so double them first.
+  const literal = encodeURIComponent(String(query).replaceAll("'", "''"));
+  return collectAll(`${userPath(organizer)}/drive/root/search(q='${literal}')`);
 }
 
 async function shareDriveItem(organizer, itemId, emails) {

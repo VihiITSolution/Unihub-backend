@@ -8,6 +8,12 @@ async function sendVerificationSms(phoneNumber, code) {
   if (!process.env.SMSGO_API_KEY) {
     throw new Error("SMS verification is not configured");
   }
+  // The mask must be a sender ID registered to UniHub and whitelisted by TRCSL.
+  // Falling back to a shared default would deliver OTPs under another party's
+  // brand, so treat a missing mask the same way as a missing API key.
+  if (!process.env.SMSGO_MASK) {
+    throw new Error("SMS verification is not configured");
+  }
 
   try {
     await axios.post(
@@ -15,7 +21,7 @@ async function sendVerificationSms(phoneNumber, code) {
       {
         to: smsgoRecipient(phoneNumber),
         message: `UniHub verification code: ${code}. It expires in 10 minutes.`,
-        mask: process.env.SMSGO_MASK || "SMSGo",
+        mask: process.env.SMSGO_MASK,
       },
       {
         timeout,
