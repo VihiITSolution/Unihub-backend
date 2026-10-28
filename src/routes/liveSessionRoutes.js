@@ -40,6 +40,22 @@ router.put(
   liveSessionController.updateLiveSession
 );
 
+// Recording metadata and course publishing are deliberately separate from the
+// session scheduler: recordings remain editable after a session has ended.
+router.put(
+  '/:id/recording',
+  authMiddleware,
+  authorize('tutor', 'admin'),
+  liveSessionController.updateRecording
+);
+
+router.post(
+  '/:id/recording/course-content',
+  authMiddleware,
+  authorize('tutor', 'admin'),
+  liveSessionController.addRecordingToCourse
+);
+
 router.delete(
   '/:id',
   authMiddleware,

@@ -205,4 +205,74 @@ const downloadMicrosoftDriveVideo = async (sharingUrl, accessToken) => {
   }
 };
 
-module.exports = { downloadPublicOneDriveVideo, downloadMicrosoftDriveVideo };
+/**
+ * Download a recording already owned by UniHub's Teams organizer.  Unlike a
+ * user-supplied share link, this uses the organizer drive item saved when the
+ * recording was synced, so tutors never need access to the organizer account.
+ */
+const downloadMicrosoftDriveItem = async (organizer, itemId, accessToken) => {
+  let response;
+  try {
+    const graphResponse = await axios.get(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(organizer)}/drive/items/${encodeURIComponent(itemId)}/content`,
+      {
+        responseType: "stream",
+        maxRedirects: 0,
+        timeout: 30_000,
+        maxContentLength: maxImportBytes,
+        maxBodyLength: maxImportBytes,
+        headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "UniHub recording importer" },
+        validateStatus: (status) => (status >= 200 && status < 300) || (status >= 300 && status < 400),
+      },
+    );
+    if (graphResponse.status >= 300 && graphResponse.status < 400) {
+      graphResponse.data?.destroy?.();
+      const downloadUrl = graphResponse.headers.location;
+      const host = new URL(downloadUrl).hostname.toLowerCase();
+      if (!downloadUrl?.startsWith("https://") || (!host.endsWith(".1drv.com") && !host.endsWith(".sharepoint.com") && !host.endsWith(".onedrive.com"))) {
+        throw importError("Microsoft returned an unsafe recording download address.", 502);
+      }
+      response = await axios.get(downloadUrl, {
+        responseType: "stream", maxRedirects: 3, timeout: 30_000,
+        maxContentLength: maxImportBytes, maxBodyLength: maxImportBytes,
+        headers: { "User-Agent": "UniHub recording importer" },
+        validateStatus: (status) => status >= 200 && status < 300,
+      });
+    } else {
+      response = graphResponse;
+    }
+  } catch (error) {
+    if (error.statusCode) throw error;
+    const status = error.response?.status;
+    if (status === 401 || status === 403 || status === 404) {
+      throw importError("The Teams organizer cannot access this recording. Sync the session artifacts again and retry.", 409);
+    }
+    throw importError("UniHub could not download the Teams recording. Please retry in a few minutes.", 502);
+  }
+
+  const contentType = String(response.headers["content-type"] || "").toLowerCase();
+  if (contentType.includes("text/html")) {
+    response.data.destroy();
+    throw importError("Microsoft returned a web page instead of the recording file.");
+  }
+  const originalName = filenameFromHeaders(response.headers);
+  const extension = path.extname(originalName) || ".mp4";
+  const filePath = path.join(importsDir, `teams-recording-${Date.now()}-${crypto.randomUUID()}${extension}`);
+  let downloadedBytes = 0;
+  const sizeGuard = new Transform({
+    transform(chunk, _encoding, callback) {
+      downloadedBytes += chunk.length;
+      if (downloadedBytes > maxImportBytes) return callback(importError("The recording exceeds the import size limit."));
+      callback(null, chunk);
+    },
+  });
+  try {
+    await pipeline(response.data, sizeGuard, fs.createWriteStream(filePath));
+    return { filePath, originalName, contentType };
+  } catch (error) {
+    try { fs.unlinkSync(filePath); } catch {}
+    throw error;
+  }
+};
+
+module.exports = { downloadPublicOneDriveVideo, downloadMicrosoftDriveVideo, downloadMicrosoftDriveItem };

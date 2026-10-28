@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const graph = require("./teamsGraphService");
+const { downloadMicrosoftDriveItem } = require("./oneDriveImport.service");
 const {
   sequelize, User, TutorProfile, LiveSession, SessionEnrollment, Notification,
   MeetingOrganizerAccount, LiveSessionMeeting, UserMeetingIdentity,
@@ -316,6 +317,26 @@ async function removeRecording(sessionId, actorUserId) {
   await event(sessionId, actorUserId, "recording.deleted");
 }
 
+async function downloadRecording(sessionId) {
+  const meeting = await LiveSessionMeeting.findOne({ where: { sessionId } });
+  if (!meeting?.recordingDriveItemId) {
+    const error = new Error("The recording is not ready to import yet");
+    error.statusCode = 409;
+    throw error;
+  }
+  const organizer = await MeetingOrganizerAccount.findByPk(meeting.organizerAccountId);
+  if (!organizer) {
+    const error = new Error("The Teams organizer for this recording is unavailable");
+    error.statusCode = 409;
+    throw error;
+  }
+  return downloadMicrosoftDriveItem(
+    organizer.entraUserId || organizer.email,
+    meeting.recordingDriveItemId,
+    await graph.getAccessToken(),
+  );
+}
+
 async function enqueue(sessionId, type, payload = null, uniqueSuffix = Date.now()) {
   const idempotencyKey = `${type}:${sessionId}:${uniqueSuffix}`;
   const [job] = await LiveSessionProviderJob.findOrCreate({ where: { idempotencyKey }, defaults: { sessionId, type, payload, runAfter: new Date() } });
@@ -375,6 +396,6 @@ async function notifySessionUsers(sessionId, title, message) {
 
 module.exports = {
   enabled, ensureIdentity, getIdentityStatus, checkOrganizerHealth, assertNoConflict,
-  event, enqueue, provision, syncAttendees, syncArtifacts, cancelMeeting, removeRecording,
+  event, enqueue, provision, syncAttendees, syncArtifacts, cancelMeeting, removeRecording, downloadRecording,
   processOneJob, finalizeOverdueSessions, notifySessionUsers,
 };

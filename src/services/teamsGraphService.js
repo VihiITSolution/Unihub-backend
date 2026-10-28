@@ -266,7 +266,7 @@ async function getDriveQuota(organizer) {
 }
 
 module.exports = {
-  configured, safeError, inviteGuest, getGuest, getOrganizer, createCalendarMeeting,
+  configured, safeError, getAccessToken, inviteGuest, getGuest, getOrganizer, createCalendarMeeting,
   createOnlineMeeting, getOnlineMeeting,
   getCalendarEvent, updateCalendarMeeting, cancelCalendarMeeting, findOnlineMeeting,
   configureOnlineMeeting, listAttendanceReports, listRecordings, searchOrganizerDrive,

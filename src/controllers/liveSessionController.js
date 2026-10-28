@@ -1,10 +1,12 @@
 const { Op } = require("sequelize");
-const { sequelize, LiveSession, User, Course, TutorProfile, LiveSessionMeeting, MeetingOrganizerAccount } = require("../models");
+const { sequelize, LiveSession, User, Course, CourseContent, TutorProfile, LiveSessionMeeting, MeetingOrganizerAccount } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const provider = require("../services/liveSessionProviderService");
 const { publicSession, ownerSession } = require("../utils/liveSessionPresentation");
-const { ensureAffiliateAccount, validateReferralCode } = require("../services/affiliate.service");
+const { ensureAffiliateAccount, validateReferralCode, recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const { validateLiveSessionReferralInvite } = require("../services/liveSessionReferral.service");
+const { syncCourseDuration } = require("../services/courseDuration.service");
+const fs = require("fs");
 
 const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
 const owns = (session, user) => isAdmin(user) || session.tutorId === user.id;
@@ -12,6 +14,25 @@ const includes = [
   { model: User, as: "tutor", attributes: ["id", "firstName", "lastName", "email", "profileImage"] },
   { model: Course, as: "course", attributes: ["id", "title", "thumbnail"] },
 ];
+
+const recordingEmbedUrl = (videoId) => `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&cc_load_policy=0`;
+
+function recordingTags(value) {
+  const rawTags = Array.isArray(value) ? value : String(value || "").split(",");
+  const tags = [...new Set(rawTags.map((tag) => String(tag).trim().replace(/\s+/g, " ")).filter(Boolean))];
+  if (tags.length > 10 || tags.some((tag) => tag.length > 40)) {
+    const error = new Error("Use up to 10 categories, each no longer than 40 characters");
+    error.statusCode = 400;
+    throw error;
+  }
+  return tags;
+}
+
+function recordingDuration(session) {
+  const start = session.actualStartTime || session.scheduledStartTime;
+  const end = session.actualEndTime || session.scheduledEndTime;
+  return Math.max(1, Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / 60_000));
+}
 
 function referralInviteSession(session, tutor) {
   return {
@@ -283,6 +304,89 @@ async function endLiveSession(req, res, next) {
   } catch (error) { next(error); }
 }
 
+async function updateRecording(req, res, next) {
+  try {
+    const session = await LiveSession.findByPk(req.params.id, { include: includes });
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!owns(session, req.user)) return res.status(403).json({ success: false, message: "Not authorized to manage this recording" });
+    if (!session.recordingUrl || !["ended", "recorded"].includes(session.status)) {
+      return res.status(409).json({ success: false, message: "The recording is not ready to edit yet" });
+    }
+
+    const updates = {};
+    if (req.body.title !== undefined) {
+      const title = String(req.body.title).trim();
+      if (!title || title.length > 255) return res.status(400).json({ success: false, message: "A recording title of up to 255 characters is required" });
+      updates.title = title;
+    }
+    if (req.body.description !== undefined) {
+      const description = String(req.body.description).trim();
+      if (description.length > 10_000) return res.status(400).json({ success: false, message: "Recording description must be 10,000 characters or fewer" });
+      updates.description = description || null;
+    }
+    if (req.body.tags !== undefined) updates.tags = recordingTags(req.body.tags);
+    if (!Object.keys(updates).length) return res.status(400).json({ success: false, message: "Provide a title, description, or category" });
+
+    await session.update(updates);
+    await provider.event(session.id, req.user.id, "recording.updated", { fields: Object.keys(updates) });
+    res.json({ success: true, message: "Recording details updated", data: { session: ownerSession(session) } });
+  } catch (error) { next(error); }
+}
+
+async function addRecordingToCourse(req, res, next) {
+  let importedFilePath = null;
+  try {
+    const session = await LiveSession.findByPk(req.params.id, { include: includes });
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!owns(session, req.user)) return res.status(403).json({ success: false, message: "Not authorized to use this recording" });
+    if (!session.recordingUrl || !["ended", "recorded"].includes(session.status)) {
+      return res.status(409).json({ success: false, message: "The recording is not ready to add to a course yet" });
+    }
+
+    const courseId = Number(req.body.courseId);
+    if (!Number.isInteger(courseId) || courseId < 1) return res.status(400).json({ success: false, message: "Choose a course" });
+    const course = await Course.findByPk(courseId);
+    if (!course || Number(course.tutorId) !== Number(session.tutorId)) {
+      return res.status(400).json({ success: false, message: "Choose one of this tutor's courses" });
+    }
+
+    const title = String(req.body.title || session.title).trim();
+    if (!title || title.length > 255) return res.status(400).json({ success: false, message: "A lesson title of up to 255 characters is required" });
+    const order = req.body.order === undefined ? await CourseContent.count({ where: { courseId } }) : Number(req.body.order);
+    if (!Number.isInteger(order) || order < 0) return res.status(400).json({ success: false, message: "Lesson order must be zero or a positive whole number" });
+
+    let youtubeVideoId = session.youtubeVideoId || null;
+    let url = youtubeVideoId ? recordingEmbedUrl(youtubeVideoId) : null;
+    if (!url) {
+      const downloaded = await provider.downloadRecording(session.id);
+      importedFilePath = downloaded.filePath;
+      const youtubeUrl = await youtubeUploader.uploadVideo(
+        importedFilePath,
+        `${title} - Live session recording #${session.id}`,
+        session.description || `Recording of UniHub live session: ${session.title}`,
+      );
+      youtubeVideoId = youtubeUrl.includes("watch?v=") ? youtubeUrl.split("watch?v=")[1]?.split("&")[0] : youtubeUrl.split("youtu.be/")[1]?.split("?")[0];
+      if (!youtubeVideoId) throw new Error("YouTube did not return a video ID for the recording import");
+      url = recordingEmbedUrl(youtubeVideoId);
+    }
+
+    const content = await CourseContent.create({
+      courseId, title, type: "video", url, youtubeVideoId,
+      duration: recordingDuration(session), order,
+      isPreview: req.body.isPreview === true || req.body.isPreview === "true",
+    });
+    await recordQualifyingVideoActivity(course, content);
+    await syncCourseDuration(course.id);
+    await provider.event(session.id, req.user.id, "recording.added_to_course", { courseId, contentId: content.id });
+    res.status(201).json({ success: true, message: "Recording uploaded to the course as a video lesson", data: { content } });
+  } catch (error) { next(error); }
+  finally {
+    if (importedFilePath) {
+      try { fs.unlinkSync(importedFilePath); } catch {}
+    }
+  }
+}
+
 async function getMeetingIdentity(req, res, next) {
   try {
     const identity = await provider.getIdentityStatus(req.user);
@@ -297,4 +401,4 @@ async function setMeetingIdentity(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, getLiveSessionReferralInvite, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, getMeetingIdentity, setMeetingIdentity };
+module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, getLiveSessionReferralInvite, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, updateRecording, addRecordingToCourse, getMeetingIdentity, setMeetingIdentity };
