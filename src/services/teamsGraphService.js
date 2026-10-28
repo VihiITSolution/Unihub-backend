@@ -102,22 +102,70 @@ async function getOrganizer(userIdOrEmail) {
   return response.data;
 }
 
-async function createCalendarMeeting(organizer, session, attendees) {
+const graphDateTime = (value) => new Date(value).toISOString().replace("Z", "");
+
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"]/g, (c) => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]
+));
+
+// The calendar event carries the join link in its body rather than asking
+// Exchange to mint a Teams meeting via isOnlineMeeting. See createOnlineMeeting.
+const eventBody = (session, joinUrl) => ({
+  contentType: "HTML",
+  content: [
+    `<p>${escapeHtml(session.description || "UniHub live learning session")}</p>`,
+    joinUrl ? `<p><a href="${escapeHtml(joinUrl)}">Join the Microsoft Teams meeting</a></p>` : "",
+  ].join(""),
+});
+
+const eventAttendees = (attendees) => attendees.map((item) => ({
+  emailAddress: { address: item.email, name: item.name || item.email },
+  type: "required",
+}));
+
+// Create the Teams meeting directly instead of setting isOnlineMeeting on the
+// calendar event. Event-driven creation depends on the organizer's Teams
+// meeting policy (notably the Outlook add-in setting) and on the mailbox having
+// been used interactively; when either is unmet Graph still returns 201 but
+// with onlineMeeting null and onlineMeetingProvider "unknown", leaving no join
+// URL. The onlineMeetings endpoint is the app-only path and is deterministic:
+// it is covered by OnlineMeetings.ReadWrite.All plus the Teams application
+// access policy that already scopes this app to the organizer.
+async function createOnlineMeeting(organizer, session) {
+  const response = await request({
+    method: "post",
+    url: `${userPath(organizer)}/onlineMeetings`,
+    data: {
+      subject: `[UniHub #${session.id}] ${session.title}`,
+      startDateTime: new Date(session.scheduledStartTime).toISOString(),
+      endDateTime: new Date(session.scheduledEndTime).toISOString(),
+      allowedPresenters: "roleIsPresenter",
+      recordAutomatically: Boolean(session.allowRecording),
+    },
+  });
+  return response.data;
+}
+
+async function getOnlineMeeting(organizer, meetingId) {
+  const response = await request({
+    method: "get",
+    url: `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}`,
+  });
+  return response.data;
+}
+
+async function createCalendarMeeting(organizer, session, attendees, joinUrl) {
   const response = await request({
     method: "post",
     url: `${userPath(organizer)}/events`,
     headers: { Prefer: 'outlook.timezone="UTC"' },
     data: {
       subject: `[UniHub #${session.id}] ${session.title}`,
-      body: { contentType: "HTML", content: session.description || "UniHub live learning session" },
-      start: { dateTime: new Date(session.scheduledStartTime).toISOString().replace("Z", ""), timeZone: "UTC" },
-      end: { dateTime: new Date(session.scheduledEndTime).toISOString().replace("Z", ""), timeZone: "UTC" },
-      attendees: attendees.map((item) => ({
-        emailAddress: { address: item.email, name: item.name || item.email },
-        type: "required",
-      })),
-      isOnlineMeeting: true,
-      onlineMeetingProvider: "teamsForBusiness",
+      body: eventBody(session, joinUrl),
+      start: { dateTime: graphDateTime(session.scheduledStartTime), timeZone: "UTC" },
+      end: { dateTime: graphDateTime(session.scheduledEndTime), timeZone: "UTC" },
+      attendees: eventAttendees(attendees),
+      location: joinUrl ? { displayName: "Microsoft Teams Meeting" } : undefined,
       allowNewTimeProposals: false,
       transactionId: `unihub-live-session-${session.id}`,
     },
@@ -130,16 +178,16 @@ async function getCalendarEvent(organizer, eventId) {
   return response.data;
 }
 
-async function updateCalendarMeeting(organizer, eventId, session, attendees) {
+async function updateCalendarMeeting(organizer, eventId, session, attendees, joinUrl) {
   await request({
     method: "patch",
     url: `${userPath(organizer)}/events/${encodeURIComponent(eventId)}`,
     data: {
       subject: `[UniHub #${session.id}] ${session.title}`,
-      body: { contentType: "HTML", content: session.description || "UniHub live learning session" },
-      start: { dateTime: new Date(session.scheduledStartTime).toISOString().replace("Z", ""), timeZone: "UTC" },
-      end: { dateTime: new Date(session.scheduledEndTime).toISOString().replace("Z", ""), timeZone: "UTC" },
-      attendees: attendees.map((item) => ({ emailAddress: { address: item.email, name: item.name || item.email }, type: "required" })),
+      body: eventBody(session, joinUrl),
+      start: { dateTime: graphDateTime(session.scheduledStartTime), timeZone: "UTC" },
+      end: { dateTime: graphDateTime(session.scheduledEndTime), timeZone: "UTC" },
+      attendees: eventAttendees(attendees),
     },
   });
 }
@@ -219,6 +267,7 @@ async function getDriveQuota(organizer) {
 
 module.exports = {
   configured, safeError, inviteGuest, getGuest, getOrganizer, createCalendarMeeting,
+  createOnlineMeeting, getOnlineMeeting,
   getCalendarEvent, updateCalendarMeeting, cancelCalendarMeeting, findOnlineMeeting,
   configureOnlineMeeting, listAttendanceReports, listRecordings, searchOrganizerDrive,
   shareDriveItem, deleteDriveItem, getDriveQuota,

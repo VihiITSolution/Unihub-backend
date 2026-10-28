@@ -195,21 +195,31 @@ async function provision(sessionId) {
   try {
     const { attendees, tutorIdentity } = await attendeesFor(session);
     const organizerRef = organizer.entraUserId || organizer.email;
-    let remoteEvent;
-    if (meeting.outlookEventId) remoteEvent = await graph.getCalendarEvent(organizerRef, meeting.outlookEventId);
-    else {
-      remoteEvent = await graph.createCalendarMeeting(organizerRef, session, attendees);
-      await meeting.update({ outlookEventId: remoteEvent.id, joinUrl: remoteEvent.onlineMeeting?.joinUrl || null });
+
+    // The Teams meeting is created first and owns the join URL. The calendar
+    // event is then built around it, so a tenant policy that blocks implicit
+    // meeting creation on events can no longer leave a session without a link.
+    let onlineMeeting = meeting.teamsMeetingId
+      ? await graph.getOnlineMeeting(organizerRef, meeting.teamsMeetingId)
+      : await graph.createOnlineMeeting(organizerRef, session);
+    if (!onlineMeeting?.id || !onlineMeeting.joinWebUrl) {
+      throw new Error("Teams did not return a join URL for the online meeting");
     }
-    if (!meeting.joinUrl && remoteEvent.onlineMeeting?.joinUrl) meeting.joinUrl = remoteEvent.onlineMeeting.joinUrl;
-    if (!meeting.joinUrl) throw new Error("Teams join URL is not ready; retry provisioning shortly");
-    let onlineMeeting = meeting.teamsMeetingId ? { id: meeting.teamsMeetingId } : await graph.findOnlineMeeting(organizerRef, meeting.joinUrl);
-    if (!onlineMeeting?.id) throw new Error("Teams online meeting resource is not ready; retry provisioning shortly");
+    await meeting.update({ teamsMeetingId: onlineMeeting.id, joinUrl: onlineMeeting.joinWebUrl });
+
     onlineMeeting = await graph.configureOnlineMeeting(organizerRef, onlineMeeting.id, tutorIdentity, session.allowRecording);
+    const joinUrl = onlineMeeting.joinWebUrl || meeting.joinUrl;
+
+    if (meeting.outlookEventId) {
+      await graph.updateCalendarMeeting(organizerRef, meeting.outlookEventId, session, attendees, joinUrl);
+    } else {
+      const remoteEvent = await graph.createCalendarMeeting(organizerRef, session, attendees, joinUrl);
+      await meeting.update({ outlookEventId: remoteEvent.id });
+    }
+
     await meeting.update({
-      teamsMeetingId: onlineMeeting.id,
       meetingOptionsUrl: onlineMeeting.joinInformation?.contentUrl || null,
-      joinUrl: onlineMeeting.joinWebUrl || meeting.joinUrl,
+      joinUrl,
       syncStatus: "ready", lastError: null, lastSyncedAt: new Date(),
     });
     await session.update({ providerStatus: "ready", providerSyncedAt: new Date() });
@@ -228,7 +238,7 @@ async function syncAttendees(sessionId) {
   if (!session || !meeting?.outlookEventId) return;
   const organizer = await MeetingOrganizerAccount.findByPk(meeting.organizerAccountId);
   const { attendees } = await attendeesFor(session);
-  await graph.updateCalendarMeeting(organizer.entraUserId || organizer.email, meeting.outlookEventId, session, attendees);
+  await graph.updateCalendarMeeting(organizer.entraUserId || organizer.email, meeting.outlookEventId, session, attendees, meeting.joinUrl);
   await meeting.update({ syncStatus: "ready", lastError: null, lastSyncedAt: new Date() });
   await session.update({ providerStatus: "ready", providerSyncedAt: new Date() });
   await event(session.id, null, "provider.attendees_synced", { count: attendees.length });

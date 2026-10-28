@@ -17,6 +17,10 @@ router.get(
   liveSessionController.getLiveSessions
 );
 
+// Literal paths must be registered before the '/:id' routes below. Express
+// matches in declaration order, so '/my/enrollments' would otherwise be
+// captured by '/:id/enrollments' with id === 'my' and return 404.
+router.get('/my/enrollments', authMiddleware, sessionEnrollmentController.getMyEnrollments);
 router.get('/mine', authMiddleware, authorize('tutor', 'admin'), liveSessionController.getMyLiveSessions);
 router.get('/meeting-identity', authMiddleware, liveSessionController.getMeetingIdentity);
 router.post('/meeting-identity', authMiddleware, liveSessionController.setMeetingIdentity);
@@ -91,11 +95,5 @@ router.post(
   sessionEnrollmentController.leaveSession
 );
 
-// My enrollments
-router.get(
-  '/my/enrollments',
-  authMiddleware,
-  sessionEnrollmentController.getMyEnrollments
-);
 
 module.exports = router;
