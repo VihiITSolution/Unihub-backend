@@ -15,6 +15,7 @@
     "migrate:course-duration-minutes": "node src/migrations/20261001-course-duration-minutes.js",
     "migrate:affiliate-deadline": "node src/migrations/extend-affiliate-signup-deadline.js",
     "migrate:course-support-materials": "node src/migrations/20261027-course-support-material-links.js",
+    "migrate:microsoft-drive": "node src/migrations/20261027-microsoft-drive-connections.js",
     "seed": "node src/migrations/seed.js",
     "test": "node --test test/*.test.js"
   },

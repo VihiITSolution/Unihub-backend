@@ -14,6 +14,7 @@ const {
   AffiliateReferral,
   AffiliatePayoutRequest,
   AffiliateLedgerEntry,
+  MicrosoftDriveConnection,
 } = require("../models");
 const Faculty = require("../models/Faculty");
 const BoardingPlace = require("../models/BoardingPlace");
@@ -23,7 +24,8 @@ const { calculateFreeTrialExpirationDate } = require("./marketplaceController");
 const { ensureAffiliateAccount, recordApprovedActivity, recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 const youtubeUploader = require("../config/youtube");
-const { downloadPublicOneDriveVideo } = require("../services/oneDriveImport.service");
+const { downloadPublicOneDriveVideo, downloadMicrosoftDriveVideo } = require("../services/oneDriveImport.service");
+const { accessTokenFor } = require("../services/microsoftDrive.service");
 const { syncCourseDuration } = require("../services/courseDuration.service");
 const { presentCourseContent } = require("../services/courseSupportMaterial.service");
 const fs = require("fs");
@@ -694,7 +696,7 @@ const importCourseContentFromOneDrive = async (req, res, next) => {
 
   try {
     const { id } = req.params;
-    const { oneDriveUrl, title, duration, order, isPreview } = req.body || {};
+    const { oneDriveUrl, title, duration, order, isPreview, useConnectedMicrosoftAccount } = req.body || {};
     const normalizedTitle = String(title || "").trim();
     const normalizedOrder = Number(order ?? 0);
     const normalizedDuration = duration === undefined || duration === "" ? null : Number(duration);
@@ -714,7 +716,16 @@ const importCourseContentFromOneDrive = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
-    const downloaded = await downloadPublicOneDriveVideo(oneDriveUrl);
+    let downloaded;
+    if (useConnectedMicrosoftAccount === true || useConnectedMicrosoftAccount === "true") {
+      const connection = await MicrosoftDriveConnection.findOne({ where: { userId: req.user.id } });
+      if (!connection) {
+        return res.status(409).json({ success: false, message: "Connect the Microsoft account that has access to this file before importing it." });
+      }
+      downloaded = await downloadMicrosoftDriveVideo(oneDriveUrl, await accessTokenFor(connection));
+    } else {
+      downloaded = await downloadPublicOneDriveVideo(oneDriveUrl);
+    }
     importedFilePath = downloaded.filePath;
     const youtubeUrl = await youtubeUploader.uploadVideo(
       importedFilePath,

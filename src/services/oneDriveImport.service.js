@@ -126,4 +126,83 @@ const downloadPublicOneDriveVideo = async (sharingUrl) => {
   }
 };
 
-module.exports = { downloadPublicOneDriveVideo };
+const shareIdFromUrl = (value) => {
+  const url = new URL(String(value || "").trim());
+  if (!isOneDriveHost(url.hostname)) throw importError("Only OneDrive or SharePoint links are supported.");
+  // Stream player links carry the actual SharePoint file path in `id`.
+  // Turn that into the canonical file URL before asking Graph for the item.
+  if (url.pathname.toLowerCase().includes("/_layouts/15/stream.aspx")) {
+    const filePath = url.searchParams.get("id");
+    if (!filePath?.startsWith("/")) throw importError("This Stream link does not contain a file path.");
+    url.pathname = filePath;
+    url.search = "";
+  }
+  return `u!${Buffer.from(url.toString()).toString("base64url")}`;
+};
+
+const downloadMicrosoftDriveVideo = async (sharingUrl, accessToken) => {
+  let response;
+  try {
+    const shareId = shareIdFromUrl(sharingUrl);
+    const graphResponse = await axios.get(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
+      responseType: "stream",
+      maxRedirects: 0,
+      timeout: 30_000,
+      maxContentLength: maxImportBytes,
+      maxBodyLength: maxImportBytes,
+      headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": "UniHub course importer" },
+      validateStatus: (status) => (status >= 200 && status < 300) || (status >= 300 && status < 400),
+    });
+    if (graphResponse.status >= 300 && graphResponse.status < 400) {
+      graphResponse.data.destroy();
+      const downloadUrl = graphResponse.headers.location;
+      const host = new URL(downloadUrl).hostname.toLowerCase();
+      if (!downloadUrl?.startsWith("https://") || (!host.endsWith(".1drv.com") && !host.endsWith(".sharepoint.com") && !host.endsWith(".onedrive.com"))) {
+        throw importError("Microsoft returned an unsafe download address.", 502);
+      }
+      // The short-lived address is pre-authorized; never forward the Microsoft
+      // bearer token to a different host.
+      response = await axios.get(downloadUrl, {
+        responseType: "stream", maxRedirects: 3, timeout: 30_000,
+        maxContentLength: maxImportBytes, maxBodyLength: maxImportBytes,
+        headers: { "User-Agent": "UniHub course importer" },
+        validateStatus: (status) => status >= 200 && status < 300,
+      });
+    } else {
+      response = graphResponse;
+    }
+  } catch (error) {
+    if (error.statusCode) throw error;
+    const status = error.response?.status;
+    if (status === 401 || status === 403 || status === 404) {
+      throw importError("The connected Microsoft account cannot access this file. Sign in with the SLIIT account that can open the recording.");
+    }
+    throw importError("Microsoft Graph could not download this file. Reconnect the Microsoft account and try again.", 502);
+  }
+
+  const contentType = String(response.headers["content-type"] || "").toLowerCase();
+  if (contentType.includes("text/html")) {
+    response.data.destroy();
+    throw importError("Microsoft returned a web page instead of the video file. Check that the account can download this recording.");
+  }
+  const originalName = filenameFromHeaders(response.headers);
+  const extension = path.extname(originalName) || ".mp4";
+  const filePath = path.join(importsDir, `microsoft-${Date.now()}-${crypto.randomUUID()}${extension}`);
+  let downloadedBytes = 0;
+  const sizeGuard = new Transform({
+    transform(chunk, _encoding, callback) {
+      downloadedBytes += chunk.length;
+      if (downloadedBytes > maxImportBytes) return callback(importError("The OneDrive video exceeds the import size limit."));
+      callback(null, chunk);
+    },
+  });
+  try {
+    await pipeline(response.data, sizeGuard, fs.createWriteStream(filePath));
+    return { filePath, originalName, contentType };
+  } catch (error) {
+    try { fs.unlinkSync(filePath); } catch {}
+    throw error;
+  }
+};
+
+module.exports = { downloadPublicOneDriveVideo, downloadMicrosoftDriveVideo };

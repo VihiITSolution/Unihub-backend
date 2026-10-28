@@ -46,10 +46,17 @@ const {
 const adminLiveSessions = require("../controllers/adminLiveSessionController");
 const liveSessionController = require("../controllers/liveSessionController");
 const affiliateAdmin = require("../controllers/adminAffiliateController");
+const microsoftDrive = require("../controllers/microsoftDriveController");
 
 const router = express.Router();
 
 router.get("/affiliate/referrals", authMiddleware, authorize("admin"), affiliateAdmin.listReferrals);
+router.get("/microsoft-drive", authMiddleware, authorize("admin"), microsoftDrive.getStatus);
+router.post("/microsoft-drive/authorize", authMiddleware, authorize("admin"), microsoftDrive.authorize);
+router.delete("/microsoft-drive", authMiddleware, authorize("admin"), microsoftDrive.disconnect);
+// Microsoft redirects here without UniHub's bearer token; the signed, short-lived
+// OAuth state binds the callback to the administrator who started it.
+router.get("/microsoft-drive/callback", microsoftDrive.callback);
 router.post("/affiliate/referrals/:id/review", authMiddleware, authorize("admin"), auditAdminAction("affiliate.referral_reviewed", "affiliate_referral", "Reviewed an affiliate referral"), affiliateAdmin.reviewReferral);
 router.get("/affiliate/payouts", authMiddleware, authorize("admin"), affiliateAdmin.listPayouts);
 router.get("/affiliate/payouts/:id", authMiddleware, authorize("admin"), affiliateAdmin.payoutDetail);
