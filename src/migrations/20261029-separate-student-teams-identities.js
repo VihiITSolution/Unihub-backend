@@ -15,10 +15,15 @@ async function separateStudentTeamsIdentities() {
     LEFT JOIN live_sessions session_row ON session_row.tutor_id = identity_row.user_id AND session_row.provider = 'teams'
     SET identity_row.identity_type = 'tutor'
     WHERE identity_row.provider = 'teams'
-      AND (LOWER(COALESCE(profile.teams_email, '')) = LOWER(identity_row.email) OR session_row.id IS NOT NULL)
+      AND (BINARY LOWER(COALESCE(profile.teams_email, '')) = BINARY LOWER(identity_row.email) OR session_row.id IS NOT NULL)
   `);
 
   const [indexes] = await sequelize.query("SHOW INDEX FROM user_meeting_identities");
+  // The legacy unique key can be the only index supporting the user foreign
+  // key. Add a dedicated one before replacing that unique constraint.
+  if (!indexes.some((index) => index.Key_name === "idx_meeting_identity_user")) {
+    await sequelize.query("ALTER TABLE user_meeting_identities ADD INDEX idx_meeting_identity_user (user_id)");
+  }
   const legacyUniqueIndexes = [...new Set(indexes
     .filter((index) => Number(index.Non_unique) === 0 && ["uq_user_meeting_provider", "user_meeting_identities_user_id_provider"].includes(index.Key_name))
     .map((index) => index.Key_name))];
