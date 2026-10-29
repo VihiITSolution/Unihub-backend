@@ -11,7 +11,6 @@ async function enrollInSession(req, res, next) {
   try {
     const session = await LiveSession.findByPk(req.params.id);
     if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
-    if (!req.user.isVerified) return res.status(403).json({ success: false, message: "Verify your UniHub email before enrolling in a Teams session" });
     if (!session.isFree) return res.status(403).json({ success: false, message: "Paid live-session enrollment is disabled until verified payments are implemented" });
     if (session.approvalStatus !== "approved" || session.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(session.status)) return res.status(400).json({ success: false, message: "This session is not open for enrollment" });
     const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, req.user.email) : null;
@@ -43,7 +42,6 @@ async function enrollInSession(req, res, next) {
 
 async function enrollFromReferralInvite(req, res, next) {
   try {
-    if (!req.user.isVerified) return res.status(403).json({ success: false, message: "Verify your UniHub email before enrolling in a Teams session" });
     const referral = await validateReferralCode(req.query.ref);
     if (referral.account.userId === req.user.id) return res.status(400).json({ success: false, message: "You cannot use your own live-session referral invitation" });
     const session = await validateLiveSessionReferralInvite({
@@ -79,7 +77,7 @@ async function inviteStudents(req, res, next) {
     if (!isAdmin(req.user) && session.tutorId !== req.user.id) return res.status(403).json({ success: false, message: "Not authorized to invite students" });
     if (!session.isFree) return res.status(403).json({ success: false, message: "Invitations for paid live sessions are disabled" });
     if (!Array.isArray(req.body.studentIds) || !req.body.studentIds.length) return res.status(400).json({ success: false, message: "studentIds must be a non-empty array" });
-    const students = await User.findAll({ where: { id: { [Op.in]: req.body.studentIds }, isVerified: true } });
+    const students = await User.findAll({ where: { id: { [Op.in]: req.body.studentIds } } });
     let invited = 0;
     const failed = [];
     for (const student of students) {
@@ -120,7 +118,8 @@ async function joinSession(req, res, next) {
     if (!enrollment) return res.status(403).json({ success: false, message: "A completed enrollment is required" });
     if (session.provider === "teams") {
       const identity = await provider.getIdentityStatus(req.user);
-      if (!identity || identity.invitationStatus !== "accepted" || identity.email.toLowerCase() !== req.user.email.toLowerCase()) {
+      const expectedEmail = await provider.expectedTeamsEmail(req.user);
+      if (!expectedEmail || !identity || identity.invitationStatus !== "accepted" || identity.email.toLowerCase() !== expectedEmail) {
         return res.status(403).json({ success: false, message: "Accept the Microsoft invitation and sign in with your verified UniHub email before joining", data: { identityStatus: identity?.invitationStatus || "not_invited", invitationRedeemUrl: identity?.invitationRedeemUrl || null } });
       }
       const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });

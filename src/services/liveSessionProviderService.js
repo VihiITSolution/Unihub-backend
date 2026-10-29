@@ -2,7 +2,7 @@ const { Op } = require("sequelize");
 const graph = require("./teamsGraphService");
 const { downloadMicrosoftDriveItem } = require("./oneDriveImport.service");
 const {
-  sequelize, User, TutorProfile, LiveSession, SessionEnrollment, Notification,
+  sequelize, User, StudentProfile, TutorProfile, LiveSession, SessionEnrollment, Notification,
   MeetingOrganizerAccount, LiveSessionMeeting, UserMeetingIdentity,
   LiveSessionProviderJob, LiveSessionEvent,
 } = require("../models");
@@ -11,17 +11,38 @@ const enabled = () => process.env.TEAMS_LIVE_ENABLED === "true";
 const sanitize = (error) => (error.safeMessage || error.message || "Provider operation failed").slice(0, 500);
 const rolesOf = (user) => new Set([...(Array.isArray(user.roles) ? user.roles : []), user.primaryRole].filter(Boolean));
 
+async function verifiedStudentTeamsEmail(user) {
+  const profile = await StudentProfile.findOne({ where: { userId: user.id } });
+  const studentEmail = String(profile?.studentEmail || "").trim().toLowerCase();
+  if (profile?.studentEmailVerifiedAt && /^\S+@\S+\.\S+$/.test(studentEmail)) return studentEmail;
+
+  // Keep existing accounts that verified their account email working while
+  // the newer student-email verification flow is rolled out.
+  const accountEmail = String(user.email || "").trim().toLowerCase();
+  if (user.isVerified && /^\S+@\S+\.\S+$/.test(accountEmail)) return accountEmail;
+  return null;
+}
+
+async function expectedTeamsEmail(user) {
+  if (rolesOf(user).has("tutor")) return String(user.email || "").trim().toLowerCase() || null;
+  return verifiedStudentTeamsEmail(user);
+}
+
 async function event(sessionId, actorUserId, type, metadata = null, transaction = null) {
   return LiveSessionEvent.create({ sessionId, actorUserId: actorUserId || null, type, metadata }, { transaction });
 }
 
 async function ensureIdentity(user, requestedEmail, { resend = false } = {}) {
   const isTutor = rolesOf(user).has("tutor");
-  const email = String(isTutor ? requestedEmail : user.email).trim().toLowerCase();
-  if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new Error("A valid Microsoft account email is required");
-  if (!isTutor && (!user.isVerified || email !== String(user.email).toLowerCase())) {
-    throw new Error("Students must use their verified UniHub email for Microsoft Teams");
+  const email = isTutor
+    ? String(requestedEmail || user.email || "").trim().toLowerCase()
+    : await verifiedStudentTeamsEmail(user);
+  if (!email && !isTutor) {
+    const error = new Error("Verify your student or UniHub email before enrolling in a Teams session");
+    error.statusCode = 403;
+    throw error;
   }
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new Error("A valid Microsoft account email is required");
 
   let identity = await UserMeetingIdentity.findOne({ where: { userId: user.id, provider: "teams" } });
   if (identity && identity.email !== email) {
@@ -396,6 +417,7 @@ async function notifySessionUsers(sessionId, title, message) {
 
 module.exports = {
   enabled, ensureIdentity, getIdentityStatus, checkOrganizerHealth, assertNoConflict,
+  expectedTeamsEmail,
   event, enqueue, provision, syncAttendees, syncArtifacts, cancelMeeting, removeRecording, downloadRecording,
   processOneJob, finalizeOverdueSessions, notifySessionUsers,
 };
