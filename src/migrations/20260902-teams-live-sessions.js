@@ -85,6 +85,7 @@ async function migrateTeamsLiveSessions() {
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     provider ENUM('teams') NOT NULL DEFAULT 'teams',
+    identity_type ENUM('student','tutor') NOT NULL DEFAULT 'student',
     email VARCHAR(255) NOT NULL,
     entra_guest_id VARCHAR(255) NULL,
     invitation_redeem_url TEXT NULL,
@@ -94,7 +95,7 @@ async function migrateTeamsLiveSessions() {
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY uq_user_meeting_provider (user_id, provider),
+    UNIQUE KEY uq_user_meeting_provider_type (user_id, provider, identity_type),
     INDEX idx_meeting_identity_email (email)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 

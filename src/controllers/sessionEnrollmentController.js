@@ -13,7 +13,7 @@ async function enrollInSession(req, res, next) {
     if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
     if (!session.isFree) return res.status(403).json({ success: false, message: "Paid live-session enrollment is disabled until verified payments are implemented" });
     if (session.approvalStatus !== "approved" || session.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(session.status)) return res.status(400).json({ success: false, message: "This session is not open for enrollment" });
-    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, req.user.email) : null;
+    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, null, { asStudent: true }) : null;
     const enrollment = await sequelize.transaction(async (transaction) => {
       const lockedSession = await LiveSession.findByPk(session.id, { transaction, lock: transaction.LOCK.UPDATE });
       if (lockedSession.approvalStatus !== "approved" || lockedSession.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(lockedSession.status)) {
@@ -48,7 +48,7 @@ async function enrollFromReferralInvite(req, res, next) {
       sessionId: req.params.id,
       referrerUserId: referral.account.userId,
     });
-    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, req.user.email) : null;
+    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, null, { asStudent: true }) : null;
     const result = await sequelize.transaction((transaction) => enrollReferralStudentInLiveSession({
       sessionId: session.id,
       referrerUserId: referral.account.userId,
@@ -82,7 +82,7 @@ async function inviteStudents(req, res, next) {
     const failed = [];
     for (const student of students) {
       try {
-        if (session.provider === "teams") await provider.ensureIdentity(student, student.email);
+        if (session.provider === "teams") await provider.ensureIdentity(student, null, { asStudent: true });
         const [, created] = await SessionEnrollment.findOrCreate({
           where: { sessionId: session.id, studentId: student.id },
           defaults: { invitedBy: req.user.id, invitationStatus: "pending", amountPaid: 0, paymentStatus: "completed" },
@@ -117,10 +117,9 @@ async function joinSession(req, res, next) {
     const enrollment = await SessionEnrollment.findOne({ where: { sessionId: session.id, studentId: req.user.id, paymentStatus: "completed" } });
     if (!enrollment) return res.status(403).json({ success: false, message: "A completed enrollment is required" });
     if (session.provider === "teams") {
-      const identity = await provider.getIdentityStatus(req.user);
-      const expectedEmail = await provider.expectedTeamsEmail(req.user);
-      if (!expectedEmail || !identity || identity.invitationStatus !== "accepted" || identity.email.toLowerCase() !== expectedEmail) {
-        return res.status(403).json({ success: false, message: "Accept the Microsoft invitation and sign in with your verified UniHub email before joining", data: { identityStatus: identity?.invitationStatus || "not_invited", invitationRedeemUrl: identity?.invitationRedeemUrl || null } });
+      const identity = await provider.getIdentityStatus(req.user, { asStudent: true });
+      if (!identity || identity.invitationStatus !== "accepted") {
+        return res.status(403).json({ success: false, message: "Accept the Microsoft invitation sent to your selected Teams email before joining", data: { identityStatus: identity?.invitationStatus || "not_invited", invitationRedeemUrl: identity?.invitationRedeemUrl || null } });
       }
       const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
       if (!meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });

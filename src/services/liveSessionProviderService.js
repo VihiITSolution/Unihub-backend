@@ -23,28 +23,21 @@ async function verifiedStudentTeamsEmail(user) {
   return null;
 }
 
-async function expectedTeamsEmail(user) {
-  if (rolesOf(user).has("tutor")) return String(user.email || "").trim().toLowerCase() || null;
-  return verifiedStudentTeamsEmail(user);
-}
-
 async function event(sessionId, actorUserId, type, metadata = null, transaction = null) {
   return LiveSessionEvent.create({ sessionId, actorUserId: actorUserId || null, type, metadata }, { transaction });
 }
 
-async function ensureIdentity(user, requestedEmail, { resend = false } = {}) {
-  const isTutor = rolesOf(user).has("tutor");
+async function ensureIdentity(user, requestedEmail, { resend = false, asStudent = false } = {}) {
+  // A tutor can also attend another tutor's session as a student. Explicitly
+  // preserve that context so their organizer email is never forced on them.
+  const isTutor = rolesOf(user).has("tutor") && !asStudent;
   const email = isTutor
     ? String(requestedEmail || user.email || "").trim().toLowerCase()
-    : await verifiedStudentTeamsEmail(user);
-  if (!email && !isTutor) {
-    const error = new Error("Verify your student or UniHub email before enrolling in a Teams session");
-    error.statusCode = 403;
-    throw error;
-  }
+    : String(requestedEmail || await verifiedStudentTeamsEmail(user) || user.email || "").trim().toLowerCase();
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new Error("A valid Microsoft account email is required");
+  const identityType = isTutor ? "tutor" : "student";
 
-  let identity = await UserMeetingIdentity.findOne({ where: { userId: user.id, provider: "teams" } });
+  let identity = await UserMeetingIdentity.findOne({ where: { userId: user.id, provider: "teams", identityType } });
   if (identity && identity.email !== email) {
     if (isTutor) {
       const activeApprovedSessions = await LiveSession.count({
@@ -76,7 +69,7 @@ async function ensureIdentity(user, requestedEmail, { resend = false } = {}) {
 
   const displayName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || email;
   const invitation = await graph.inviteGuest(email, displayName);
-  identity = identity || UserMeetingIdentity.build({ userId: user.id, provider: "teams", email });
+  identity = identity || UserMeetingIdentity.build({ userId: user.id, provider: "teams", identityType, email });
   identity.email = email;
   identity.entraGuestId = invitation.invitedUser?.id || null;
   identity.invitationRedeemUrl = invitation.inviteRedeemUrl || null;
@@ -89,8 +82,9 @@ async function ensureIdentity(user, requestedEmail, { resend = false } = {}) {
   return identity;
 }
 
-async function getIdentityStatus(user) {
-  const identity = await UserMeetingIdentity.findOne({ where: { userId: user.id, provider: "teams" } });
+async function getIdentityStatus(user, { asStudent = false } = {}) {
+  const identityType = rolesOf(user).has("tutor") && !asStudent ? "tutor" : "student";
+  const identity = await UserMeetingIdentity.findOne({ where: { userId: user.id, provider: "teams", identityType } });
   if (!identity) return null;
   if (identity.entraGuestId) {
     try {
@@ -184,13 +178,13 @@ async function assertNoConflict(startTime, endTime, excludeSessionId, transactio
 
 async function attendeesFor(session) {
   const tutor = await User.findByPk(session.tutorId);
-  const tutorIdentity = await UserMeetingIdentity.findOne({ where: { userId: session.tutorId, provider: "teams" } });
+  const tutorIdentity = await UserMeetingIdentity.findOne({ where: { userId: session.tutorId, provider: "teams", identityType: "tutor" } });
   if (!tutorIdentity || tutorIdentity.invitationStatus !== "accepted") throw new Error("Tutor must accept the Microsoft Teams invitation before approval");
   const enrollments = await SessionEnrollment.findAll({
     where: { sessionId: session.id, paymentStatus: "completed" },
     include: [{ model: User, as: "student", attributes: ["id", "firstName", "lastName", "email"] }],
   });
-  const identities = await UserMeetingIdentity.findAll({ where: { userId: { [Op.in]: enrollments.map((e) => e.studentId) }, provider: "teams", invitationStatus: "accepted" } });
+  const identities = await UserMeetingIdentity.findAll({ where: { userId: { [Op.in]: enrollments.map((e) => e.studentId) }, provider: "teams", identityType: "student", invitationStatus: "accepted" } });
   const identityMap = new Map(identities.map((item) => [item.userId, item]));
   const attendees = [{ email: tutorIdentity.email, name: `${tutor.firstName} ${tutor.lastName}`, presenter: true }];
   for (const enrollment of enrollments) {
@@ -286,7 +280,7 @@ async function syncArtifacts(sessionId) {
   const organizer = await MeetingOrganizerAccount.findByPk(meeting.organizerAccountId);
   const organizerRef = organizer.entraUserId || organizer.email;
   const records = await graph.listAttendanceReports(organizerRef, meeting.teamsMeetingId);
-  const identities = await UserMeetingIdentity.findAll({ where: { provider: "teams" } });
+  const identities = await UserMeetingIdentity.findAll({ where: { provider: "teams", identityType: "student" } });
   const byEmail = new Map(identities.map((identity) => [identity.email.toLowerCase(), identity]));
   let attendedCount = 0;
   for (const record of records) {
@@ -313,7 +307,7 @@ async function syncArtifacts(sessionId) {
     const item = driveItems.find((candidate) => candidate.file?.mimeType?.startsWith("video/")) || driveItems[0];
     if (item) {
       const enrollments = await SessionEnrollment.findAll({ where: { sessionId, paymentStatus: "completed" } });
-      const enrolledIdentities = await UserMeetingIdentity.findAll({ where: { userId: { [Op.in]: enrollments.map((e) => e.studentId) }, invitationStatus: "accepted" } });
+      const enrolledIdentities = await UserMeetingIdentity.findAll({ where: { userId: { [Op.in]: enrollments.map((e) => e.studentId) }, provider: "teams", identityType: "student", invitationStatus: "accepted" } });
       await graph.shareDriveItem(organizerRef, item.id, enrolledIdentities.map((identity) => identity.email));
       await meeting.update({ recordingId: recordings[0].id, recordingDriveItemId: item.id, recordingWebUrl: item.webUrl, lastSyncedAt: new Date() });
       await session.update({ recordingUrl: item.webUrl, status: "recorded" });
@@ -417,7 +411,6 @@ async function notifySessionUsers(sessionId, title, message) {
 
 module.exports = {
   enabled, ensureIdentity, getIdentityStatus, checkOrganizerHealth, assertNoConflict,
-  expectedTeamsEmail,
   event, enqueue, provision, syncAttendees, syncArtifacts, cancelMeeting, removeRecording, downloadRecording,
   processOneJob, finalizeOverdueSessions, notifySessionUsers,
 };

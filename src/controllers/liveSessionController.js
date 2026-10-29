@@ -389,14 +389,17 @@ async function addRecordingToCourse(req, res, next) {
 
 async function getMeetingIdentity(req, res, next) {
   try {
-    const identity = await provider.getIdentityStatus(req.user);
+    const identity = await provider.getIdentityStatus(req.user, { asStudent: req.query.audience === "student" });
     res.json({ success: true, data: { identity: identity ? { email: identity.email, invitationStatus: identity.invitationStatus, invitationRedeemUrl: identity.invitationRedeemUrl, lastSyncedAt: identity.lastSyncedAt, lastError: identity.lastError } : null } });
   } catch (error) { next(error); }
 }
 
 async function setMeetingIdentity(req, res, next) {
   try {
-    const identity = await provider.ensureIdentity(req.user, req.body.teamsEmail, { resend: req.body.resend === true });
+    const identity = await provider.ensureIdentity(req.user, req.body.teamsEmail, {
+      resend: req.body.resend === true,
+      asStudent: req.body.audience === "student",
+    });
     res.json({ success: true, message: "Microsoft Teams invitation sent", data: { identity: { email: identity.email, invitationStatus: identity.invitationStatus, invitationRedeemUrl: identity.invitationRedeemUrl } } });
   } catch (error) { next(error); }
 }

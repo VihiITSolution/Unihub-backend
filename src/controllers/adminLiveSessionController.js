@@ -64,7 +64,7 @@ async function detail(req, res, next) {
       order: [[{ model: LiveSessionEvent, as: "events" }, "createdAt", "DESC"]],
     });
     if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
-    const identity = await UserMeetingIdentity.findOne({ where: { userId: session.tutorId, provider: "teams" } });
+    const identity = await UserMeetingIdentity.findOne({ where: { userId: session.tutorId, provider: "teams", identityType: "tutor" } });
     res.json({ success: true, data: { session, tutorIdentity: identity } });
   } catch (error) { next(error); }
 }
