@@ -64,6 +64,26 @@ async function sendApprovalEmail(email, subject, text) {
   );
 }
 
+// General operational mail. Keep this separate from approval mail so callers
+// don't need to mislabel an email simply because it uses the same provider.
+async function sendEmail(email, subject, text) {
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+    throw new Error("Email delivery is not configured");
+  }
+
+  await axios.post(
+    "https://api.resend.com/emails",
+    { from: process.env.EMAIL_FROM, to: [email], subject, text },
+    {
+      timeout: Number(process.env.RESEND_TIMEOUT_MS || 10000),
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+}
+
 // Microsoft sends its own B2B invitation mail, but delivery is unreliable:
 // it is frequently filtered as spam, and some tenants suppress it entirely.
 // Students cannot join a session until the invitation is redeemed, so send a
@@ -105,4 +125,4 @@ async function sendTeamsInvitationEmail(email, name, redeemUrl) {
   );
 }
 
-module.exports = { sendStudentEmailVerification, sendPasswordResetCode, sendApprovalEmail, sendTeamsInvitationEmail };
+module.exports = { sendStudentEmailVerification, sendPasswordResetCode, sendApprovalEmail, sendEmail, sendTeamsInvitationEmail };

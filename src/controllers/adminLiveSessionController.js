@@ -6,6 +6,7 @@ const {
 } = require("../models");
 const provider = require("../services/liveSessionProviderService");
 const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
+const { notifyAdministrators } = require("../services/adminLiveSessionNotification.service");
 
 const tutorInclude = { model: User, as: "tutor", attributes: ["id", "firstName", "lastName", "email", "profileImage"], include: [{ model: TutorProfile, as: "tutorProfile", attributes: ["teamsEmail"] }] };
 
@@ -95,6 +96,13 @@ async function approve(req, res, next) {
     const emailSent = await notifyApprovalByEmail(result.tutorId, "liveSession", result.title);
     await provider.enqueue(result.id, "provision", null, "initial");
     await provider.notifySessionUsers(result.id, "Live session approved", `${result.title} was approved and is being prepared in Microsoft Teams.`);
+    notifyAdministrators({
+      event: "approval_updated",
+      title: "Live session approved",
+      message: `${result.title} was approved and Teams provisioning was queued.`,
+      link: "/live-sessions",
+      sessionId: result.id,
+    }).catch((notificationError) => console.error("Failed to notify administrators about live-session approval:", notificationError.message));
     res.json({ success: true, message: "Session approved; Teams provisioning queued", data: { session: result, emailSent } });
   } catch (error) { next(error); }
 }
@@ -109,6 +117,13 @@ async function reject(req, res, next) {
     await session.update({ approvalStatus: "rejected", rejectionReason: reason, approvedBy: req.user.id, approvedAt: new Date(), providerStatus: "not_provisioned" });
     await provider.event(session.id, req.user.id, "request.rejected", { reason });
     await provider.notifySessionUsers(session.id, "Live session request needs changes", `${session.title}: ${reason}`);
+    notifyAdministrators({
+      event: "approval_updated",
+      title: "Live session request rejected",
+      message: `${session.title} was returned to the tutor: ${reason}`,
+      link: "/live-sessions",
+      sessionId: session.id,
+    }).catch((notificationError) => console.error("Failed to notify administrators about live-session rejection:", notificationError.message));
     res.json({ success: true, message: "Session request rejected", data: { session } });
   } catch (error) { next(error); }
 }

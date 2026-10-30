@@ -47,6 +47,7 @@ const adminLiveSessions = require("../controllers/adminLiveSessionController");
 const liveSessionController = require("../controllers/liveSessionController");
 const affiliateAdmin = require("../controllers/adminAffiliateController");
 const microsoftDrive = require("../controllers/microsoftDriveController");
+const administrators = require("../controllers/adminAdministratorController");
 
 const router = express.Router();
 
@@ -80,6 +81,11 @@ router.post("/live-sessions/:id/sync-attendees", authMiddleware, authorize("admi
 router.post("/live-sessions/:id/sync-artifacts", authMiddleware, authorize("admin"), auditAdminAction("live_session.artifacts_synced", "live_session", "Queued artifact sync"), adminLiveSessions.syncArtifacts);
 router.post("/live-sessions/:id/resend-invitation", authMiddleware, authorize("admin"), auditAdminAction("live_session.invitation_resent", "live_session", "Resent tutor Teams invitation"), adminLiveSessions.resendTutorInvitation);
 router.delete("/live-sessions/:id/recording", authMiddleware, authorize("admin"), auditAdminAction("live_session.recording_deleted", "live_session", "Deleted a live-session recording"), adminLiveSessions.removeRecording);
+
+// Administrator access and operational-notification settings.
+router.get("/administrators", authMiddleware, authorize("admin"), administrators.list);
+router.post("/administrators", authMiddleware, authorize("admin"), auditAdminAction("administrator.granted", "user", "Granted administrator access"), administrators.add);
+router.put("/administrators/:id", authMiddleware, authorize("admin"), auditAdminAction("administrator.updated", "user", "Updated administrator access or notifications"), administrators.update);
 
 /**
  * @swagger

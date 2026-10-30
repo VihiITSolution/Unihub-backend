@@ -6,6 +6,7 @@ const { publicSession, ownerSession } = require("../utils/liveSessionPresentatio
 const { ensureAffiliateAccount, validateReferralCode, recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const { validateLiveSessionReferralInvite } = require("../services/liveSessionReferral.service");
 const { syncCourseDuration } = require("../services/courseDuration.service");
+const { notifyAdministrators } = require("../services/adminLiveSessionNotification.service");
 const fs = require("fs");
 
 const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
@@ -128,6 +129,15 @@ async function createLiveSession(req, res, next) {
       await provider.event(session.id, req.user.id, admin ? "approved.created_by_admin" : "request.submitted", { identityStatus: identity.invitationStatus }, transaction);
     });
     if (admin) await provider.enqueue(session.id, "provision", null, "initial");
+    if (!admin) {
+      notifyAdministrators({
+        event: "request_submitted",
+        title: "Live session needs approval",
+        message: `${session.title} was submitted by ${tutor.firstName} ${tutor.lastName}.`,
+        link: "/live-sessions",
+        sessionId: session.id,
+      }).catch((notificationError) => console.error("Failed to notify administrators about live-session request:", notificationError.message));
+    }
     const loaded = await LiveSession.findByPk(session.id, { include: includes });
     res.status(201).json({
       success: true,
@@ -247,8 +257,24 @@ async function updateLiveSession(req, res, next) {
       await provider.event(session.id, req.user.id, wasRejected ? "request.resubmitted" : "session.updated", { startTime, endTime }, transaction);
     });
     if (session.provider === "teams" && session.approvalStatus === "approved") await provider.enqueue(session.id, "attendee_sync");
+    if (wasRejected) {
+      notifyAdministrators({
+        event: "request_submitted",
+        title: "Live session resubmitted",
+        message: `${session.title} was updated and resubmitted for approval.`,
+        link: "/live-sessions",
+        sessionId: session.id,
+      }).catch((notificationError) => console.error("Failed to notify administrators about live-session resubmission:", notificationError.message));
+    }
     if (session.approvalStatus === "approved" && scheduleChanged) {
       await provider.notifySessionUsers(session.id, "Live session rescheduled", `${session.title} now starts at ${new Date(session.scheduledStartTime).toISOString()}.`);
+      notifyAdministrators({
+        event: "schedule_changed",
+        title: "Live session rescheduled",
+        message: `${session.title} has a new schedule.`,
+        link: "/live-sessions",
+        sessionId: session.id,
+      }).catch((notificationError) => console.error("Failed to notify administrators about live-session reschedule:", notificationError.message));
     }
     res.json({ success: true, message: wasRejected ? "Session request resubmitted" : "Session updated; provider sync queued when applicable", data: { session: ownerSession(session) } });
   } catch (error) { next(error); }
@@ -264,6 +290,13 @@ async function cancelLiveSession(req, res, next) {
     await provider.event(session.id, req.user.id, "session.cancelled", { reason: req.body?.reason || null });
     if (session.provider === "teams") await provider.enqueue(session.id, "cancel");
     await provider.notifySessionUsers(session.id, "Live session cancelled", `${session.title} has been cancelled.`);
+    notifyAdministrators({
+      event: "cancelled",
+      title: "Live session cancelled",
+      message: `${session.title} was cancelled.`,
+      link: "/live-sessions",
+      sessionId: session.id,
+    }).catch((notificationError) => console.error("Failed to notify administrators about live-session cancellation:", notificationError.message));
     res.json({ success: true, message: "Live session cancelled", data: { session: ownerSession(session) } });
   } catch (error) { next(error); }
 }

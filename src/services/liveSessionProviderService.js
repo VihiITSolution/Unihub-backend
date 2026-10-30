@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const graph = require("./teamsGraphService");
 const { sendTeamsInvitationEmail } = require("./resend.service");
+const { notifyAdministrators } = require("./adminLiveSessionNotification.service");
 const { downloadMicrosoftDriveItem } = require("./oneDriveImport.service");
 const {
   sequelize, User, StudentProfile, TutorProfile, LiveSession, SessionEnrollment, Notification,
@@ -263,6 +264,13 @@ async function provision(sessionId) {
   } catch (error) {
     await meeting.update({ syncStatus: "failed", lastError: sanitize(error), lastSyncedAt: new Date() });
     await session.update({ providerStatus: "failed" });
+    notifyAdministrators({
+      event: "provisioning_failed",
+      title: "Teams provisioning failed",
+      message: `${session.title} could not be prepared in Microsoft Teams: ${sanitize(error)}`,
+      link: "/live-sessions",
+      sessionId: session.id,
+    }).catch((notificationError) => console.error("Failed to notify administrators about Teams provisioning failure:", notificationError.message));
     await event(session.id, null, "provider.failed", { message: sanitize(error) });
     throw error;
   }
