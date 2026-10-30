@@ -205,22 +205,38 @@ async function findOnlineMeeting(organizer, joinUrl) {
   return response.data.value?.[0] || null;
 }
 
-async function configureOnlineMeeting(organizer, meetingId, presenterIdentity, allowRecording) {
+const meetingParticipant = (person) => ({
+  upn: person.email,
+  identity: person.entraGuestId
+    ? { user: { id: person.entraGuestId, displayName: person.name, tenantId: process.env.TEAMS_TENANT_ID } }
+    : undefined,
+  role: person.presenter ? "presenter" : "attendee",
+});
+
+// `attendees` is the full roster: the tutor as presenter, then every enrolled
+// student. The roster is what drives lobby bypass below, so it must be
+// re-applied whenever enrolment changes.
+async function configureOnlineMeeting(organizer, meetingId, attendees, allowRecording) {
+  const roster = (Array.isArray(attendees) ? attendees : [attendees]).filter((item) => item?.email);
   const response = await request({
     method: "patch",
     url: `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}`,
+    // `invited` is not returned by default; this header opts into the newer
+    // members of the lobbyBypassScope enum.
+    headers: { Prefer: "include-unknown-enum-members" },
     data: {
       allowedPresenters: "roleIsPresenter",
       allowAttendeeToEnableMic: true,
       allowAttendeeToEnableCamera: true,
       recordAutomatically: Boolean(allowRecording),
-      participants: {
-        attendees: [{
-          upn: presenterIdentity.email,
-          identity: { user: { id: presenterIdentity.entraGuestId, displayName: presenterIdentity.name, tenantId: process.env.TEAMS_TENANT_ID } },
-          role: "presenter",
-        }],
-      },
+      // The organizer is an unattended service mailbox, so nobody is signed in
+      // as it to admit people. Without this, every participant including the
+      // tutor is held in the lobby with no one able to let them in. "invited"
+      // admits the roster straight through and leaves anyone else - a guest
+      // speaker, someone forwarded the link - waiting for the tutor, who is a
+      // presenter and can admit them.
+      lobbyBypassSettings: { scope: "invited", isDialInBypassEnabled: false },
+      participants: { attendees: roster.map(meetingParticipant) },
     },
   });
   return response.data;

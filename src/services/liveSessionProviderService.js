@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const graph = require("./teamsGraphService");
+const { sendTeamsInvitationEmail } = require("./resend.service");
 const { downloadMicrosoftDriveItem } = require("./oneDriveImport.service");
 const {
   sequelize, User, StudentProfile, TutorProfile, LiveSession, SessionEnrollment, Notification,
@@ -77,6 +78,16 @@ async function ensureIdentity(user, requestedEmail, { resend = false, asStudent 
   identity.lastSyncedAt = new Date();
   identity.lastError = null;
   await identity.save();
+
+  // Best-effort: the redeem URL is also surfaced in the UI, so a mail failure
+  // must not fail enrolment or session approval.
+  if (identity.invitationRedeemUrl) {
+    try {
+      await sendTeamsInvitationEmail(email, displayName, identity.invitationRedeemUrl);
+    } catch (error) {
+      console.error("Teams invitation email failed", { userId: user.id, status: error?.response?.status || null });
+    }
+  }
 
   if (isTutor) await TutorProfile.update({ teamsEmail: email }, { where: { userId: user.id } });
   return identity;
@@ -186,10 +197,19 @@ async function attendeesFor(session) {
   });
   const identities = await UserMeetingIdentity.findAll({ where: { userId: { [Op.in]: enrollments.map((e) => e.studentId) }, provider: "teams", identityType: "student", invitationStatus: "accepted" } });
   const identityMap = new Map(identities.map((item) => [item.userId, item]));
-  const attendees = [{ email: tutorIdentity.email, name: `${tutor.firstName} ${tutor.lastName}`, presenter: true }];
+  const attendees = [{
+    email: tutorIdentity.email, name: `${tutor.firstName} ${tutor.lastName}`,
+    entraGuestId: tutorIdentity.entraGuestId, presenter: true,
+  }];
   for (const enrollment of enrollments) {
     const identity = identityMap.get(enrollment.studentId);
-    if (identity) attendees.push({ email: identity.email, name: `${enrollment.student.firstName} ${enrollment.student.lastName}` });
+    if (identity) {
+      attendees.push({
+        email: identity.email,
+        name: `${enrollment.student.firstName} ${enrollment.student.lastName}`,
+        entraGuestId: identity.entraGuestId,
+      });
+    }
   }
   return { attendees, tutorIdentity: { ...tutorIdentity.get(), name: `${tutor.firstName} ${tutor.lastName}` } };
 }
@@ -223,7 +243,7 @@ async function provision(sessionId) {
     }
     await meeting.update({ teamsMeetingId: onlineMeeting.id, joinUrl: onlineMeeting.joinWebUrl });
 
-    onlineMeeting = await graph.configureOnlineMeeting(organizerRef, onlineMeeting.id, tutorIdentity, session.allowRecording);
+    onlineMeeting = await graph.configureOnlineMeeting(organizerRef, onlineMeeting.id, attendees, session.allowRecording);
     const joinUrl = onlineMeeting.joinWebUrl || meeting.joinUrl;
 
     if (meeting.outlookEventId) {
@@ -254,7 +274,14 @@ async function syncAttendees(sessionId) {
   if (!session || !meeting?.outlookEventId) return;
   const organizer = await MeetingOrganizerAccount.findByPk(meeting.organizerAccountId);
   const { attendees } = await attendeesFor(session);
-  await graph.updateCalendarMeeting(organizer.entraUserId || organizer.email, meeting.outlookEventId, session, attendees, meeting.joinUrl);
+  const organizerRef = organizer.entraUserId || organizer.email;
+  await graph.updateCalendarMeeting(organizerRef, meeting.outlookEventId, session, attendees, meeting.joinUrl);
+  // Lobby bypass is driven by the meeting roster, not the calendar invitation,
+  // so a student who enrols after provisioning must be added here or they are
+  // held in the lobby.
+  if (meeting.teamsMeetingId) {
+    await graph.configureOnlineMeeting(organizerRef, meeting.teamsMeetingId, attendees, session.allowRecording);
+  }
   await meeting.update({ syncStatus: "ready", lastError: null, lastSyncedAt: new Date() });
   await session.update({ providerStatus: "ready", providerSyncedAt: new Date() });
   await event(session.id, null, "provider.attendees_synced", { count: attendees.length });
