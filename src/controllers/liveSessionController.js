@@ -322,6 +322,22 @@ async function startLiveSession(req, res, next) {
   } catch (error) { next(error); }
 }
 
+// Leaving the Teams app does not end a UniHub session. Keep a secure way for
+// the tutor to retrieve the link again until they explicitly end it.
+async function rejoinLiveSession(req, res, next) {
+  try {
+    const session = await LiveSession.findByPk(req.params.id);
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (!owns(session, req.user)) return res.status(403).json({ success: false, message: "Not authorized to join this session" });
+    if (session.status !== "live") return res.status(400).json({ success: false, message: "This Teams link is available only while the session is live" });
+    if (session.provider !== "teams") return res.status(400).json({ success: false, message: "Rejoining is available for Microsoft Teams sessions only" });
+
+    const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
+    if (!meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });
+    res.json({ success: true, message: "Open Teams to rejoin your live session", data: { session: ownerSession(session), provider: "teams", launchMode: "external", joinUrl: meeting.joinUrl } });
+  } catch (error) { next(error); }
+}
+
 async function endLiveSession(req, res, next) {
   try {
     const session = await LiveSession.findByPk(req.params.id);
@@ -437,4 +453,4 @@ async function setMeetingIdentity(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, getLiveSessionReferralInvite, updateLiveSession, cancelLiveSession, startLiveSession, endLiveSession, updateRecording, addRecordingToCourse, getMeetingIdentity, setMeetingIdentity };
+module.exports = { createLiveSession, getLiveSessions, getMyLiveSessions, getLiveSession, getLiveSessionReferralLink, getLiveSessionReferralInvite, updateLiveSession, cancelLiveSession, startLiveSession, rejoinLiveSession, endLiveSession, updateRecording, addRecordingToCourse, getMeetingIdentity, setMeetingIdentity };

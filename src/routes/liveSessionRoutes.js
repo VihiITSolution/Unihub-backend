@@ -72,6 +72,13 @@ router.post(
 );
 
 router.post(
+  '/:id/rejoin',
+  authMiddleware,
+  authorize('tutor', 'admin'),
+  liveSessionController.rejoinLiveSession
+);
+
+router.post(
   '/:id/end',
   authMiddleware,
   authorize('tutor', 'admin'),
