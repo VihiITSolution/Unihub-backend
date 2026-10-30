@@ -106,6 +106,7 @@ jobs:
               -e TEAMS_ORGANIZER_EMAIL=${{ secrets.TEAMS_ORGANIZER_EMAIL }} \
               -e TEAMS_ORGANIZER_USER_ID=${{ secrets.TEAMS_ORGANIZER_USER_ID }} \
               -e TEAMS_INVITE_REDIRECT_URL=${{ secrets.TEAMS_INVITE_REDIRECT_URL }} \
+              -e TEAMS_LOBBY_BYPASS_SCOPE=${{ secrets.TEAMS_LOBBY_BYPASS_SCOPE }} \
               -e SMSGO_API_BASE_URL=${{ secrets.SMSGO_API_BASE_URL }} \
               -e SMSGO_API_KEY=${{ secrets.SMSGO_API_KEY }} \
               -e SMSGO_MASK=${{ secrets.SMSGO_MASK }} \

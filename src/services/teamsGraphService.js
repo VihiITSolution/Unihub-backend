@@ -221,21 +221,30 @@ async function configureOnlineMeeting(organizer, meetingId, attendees, allowReco
   const response = await request({
     method: "patch",
     url: `${userPath(organizer)}/onlineMeetings/${encodeURIComponent(meetingId)}`,
-    // `invited` is not returned by default; this header opts into the newer
-    // members of the lobbyBypassScope enum.
+    // Opts into lobbyBypassScope members outside the default enum, so a
+    // tightened TEAMS_LOBBY_BYPASS_SCOPE such as "invited" is accepted.
     headers: { Prefer: "include-unknown-enum-members" },
     data: {
       allowedPresenters: "roleIsPresenter",
       allowAttendeeToEnableMic: true,
       allowAttendeeToEnableCamera: true,
       recordAutomatically: Boolean(allowRecording),
-      // The organizer is an unattended service mailbox, so nobody is signed in
-      // as it to admit people. Without this, every participant including the
-      // tutor is held in the lobby with no one able to let them in. "invited"
-      // admits the roster straight through and leaves anyone else - a guest
-      // speaker, someone forwarded the link - waiting for the tutor, who is a
-      // presenter and can admit them.
-      lobbyBypassSettings: { scope: "invited", isDialInBypassEnabled: false },
+      // Nobody signs in as the organizer: it is an unattended service mailbox
+      // holding the single Business Basic licence. Teams will not start a
+      // meeting, or admit anyone from the lobby, until someone with organizer
+      // rights is present, and a B2B guest cannot be made co-organizer
+      // ("External participants can't be made co-organizers"). Anything other
+      // than "everyone" therefore deadlocks: the tutor sits in the lobby
+      // alongside the students with nobody able to let them in.
+      //
+      // Access control lives in UniHub instead of the Teams lobby. The join
+      // URL is the capability, and joinSession() releases it only to a student
+      // with a completed enrolment and a redeemed invitation. The trade-off is
+      // that a forwarded link admits its holder without a lobby check.
+      lobbyBypassSettings: {
+        scope: process.env.TEAMS_LOBBY_BYPASS_SCOPE || "everyone",
+        isDialInBypassEnabled: false,
+      },
       participants: { attendees: roster.map(meetingParticipant) },
     },
   });
