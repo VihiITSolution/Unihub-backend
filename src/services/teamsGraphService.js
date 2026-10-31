@@ -139,7 +139,15 @@ async function createOnlineMeeting(organizer, session) {
       subject: `[UniHub #${session.id}] ${session.title}`,
       startDateTime: new Date(session.scheduledStartTime).toISOString(),
       endDateTime: new Date(session.scheduledEndTime).toISOString(),
-      allowedPresenters: "roleIsPresenter",
+      // Tutors join as whatever Microsoft account they already have, which
+      // Teams does not tie back to their Entra guest object. Under
+      // "roleIsPresenter" they are matched against the roster, fail to match,
+      // and land in the meeting as plain attendees: no screen share, no
+      // recording control, no ability to admit anyone. "everyone" is the only
+      // value that reaches a participant Teams sees as anonymous. Students
+      // become presenters too; a tutor can demote individuals from the People
+      // panel during the session.
+      allowedPresenters: "everyone",
       recordAutomatically: Boolean(session.allowRecording),
     },
   });
@@ -225,7 +233,7 @@ async function configureOnlineMeeting(organizer, meetingId, attendees, allowReco
     // tightened TEAMS_LOBBY_BYPASS_SCOPE such as "invited" is accepted.
     headers: { Prefer: "include-unknown-enum-members" },
     data: {
-      allowedPresenters: "roleIsPresenter",
+      allowedPresenters: "everyone",
       allowAttendeeToEnableMic: true,
       allowAttendeeToEnableCamera: true,
       recordAutomatically: Boolean(allowRecording),
