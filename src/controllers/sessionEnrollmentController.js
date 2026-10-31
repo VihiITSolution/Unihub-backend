@@ -13,7 +13,16 @@ async function enrollInSession(req, res, next) {
     if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
     if (!session.isFree) return res.status(403).json({ success: false, message: "Paid live-session enrollment is disabled until verified payments are implemented" });
     if (session.approvalStatus !== "approved" || session.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(session.status)) return res.status(400).json({ success: false, message: "This session is not open for enrollment" });
-    const identity = session.provider === "teams" ? await provider.ensureIdentity(req.user, null, { asStudent: true }) : null;
+    // Best-effort. The guest invitation only improves attendance matching now,
+    // so a Graph failure must not stop a student enrolling.
+    let identity = null;
+    if (session.provider === "teams") {
+      try {
+        identity = await provider.ensureIdentity(req.user, null, { asStudent: true });
+      } catch (error) {
+        console.error("Teams identity setup failed during enrolment", { userId: req.user.id, sessionId: session.id });
+      }
+    }
     const enrollment = await sequelize.transaction(async (transaction) => {
       const lockedSession = await LiveSession.findByPk(session.id, { transaction, lock: transaction.LOCK.UPDATE });
       if (lockedSession.approvalStatus !== "approved" || lockedSession.providerStatus !== "ready" || ["cancelled", "ended", "recorded"].includes(lockedSession.status)) {
@@ -34,7 +43,7 @@ async function enrollInSession(req, res, next) {
     if (session.provider === "teams") await provider.enqueue(session.id, "attendee_sync");
     res.status(201).json({
       success: true,
-      message: identity?.invitationStatus === "accepted" ? "Enrolled successfully" : "Enrolled. Accept the Microsoft invitation before joining.",
+      message: "Enrolled successfully",
       data: { enrollment, identity: identity ? { email: identity.email, invitationStatus: identity.invitationStatus, invitationRedeemUrl: identity.invitationRedeemUrl } : null },
     });
   } catch (error) { next(error); }
@@ -117,15 +126,30 @@ async function joinSession(req, res, next) {
     const enrollment = await SessionEnrollment.findOne({ where: { sessionId: session.id, studentId: req.user.id, paymentStatus: "completed" } });
     if (!enrollment) return res.status(403).json({ success: false, message: "A completed enrollment is required" });
     if (session.provider === "teams") {
-      const identity = await provider.getIdentityStatus(req.user, { asStudent: true });
-      if (!identity || identity.invitationStatus !== "accepted") {
-        return res.status(403).json({ success: false, message: "Accept the Microsoft invitation sent to your selected Teams email before joining", data: { identityStatus: identity?.invitationStatus || "not_invited", invitationRedeemUrl: identity?.invitationRedeemUrl || null } });
+      // The meeting admits anyone holding the join URL, so a redeemed
+      // invitation is no longer required to get in. It is still worth having:
+      // a student who joins under their Entra guest identity is matched in
+      // the attendance report. Refresh it opportunistically and report it
+      // back, but never block the join on it.
+      let identity = null;
+      try {
+        identity = await provider.getIdentityStatus(req.user, { asStudent: true });
+      } catch (error) {
+        console.error("Teams identity lookup failed on join", { userId: req.user.id, sessionId: session.id });
       }
       const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
       if (!meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });
       await enrollment.update({ joinLaunchedAt: new Date() });
       await provider.enqueue(session.id, "attendee_sync");
-      return res.json({ success: true, message: "Open Microsoft Teams to join", data: { provider: "teams", launchMode: "external", joinUrl: meeting.joinUrl, session: publicSession(session) } });
+      return res.json({
+        success: true, message: "Open Microsoft Teams to join",
+        data: {
+          provider: "teams", launchMode: "external", joinUrl: meeting.joinUrl,
+          session: publicSession(session),
+          identityStatus: identity?.invitationStatus || "not_invited",
+          invitationRedeemUrl: identity?.invitationRedeemUrl || null,
+        },
+      });
     }
     await enrollment.update({ joinedAt: enrollment.joinedAt || new Date(), attended: true });
     res.json({

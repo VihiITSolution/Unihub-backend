@@ -315,13 +315,29 @@ async function syncArtifacts(sessionId) {
   const organizer = await MeetingOrganizerAccount.findByPk(meeting.organizerAccountId);
   const organizerRef = organizer.entraUserId || organizer.email;
   const records = await graph.listAttendanceReports(organizerRef, meeting.teamsMeetingId);
+
+  // Attendance is matched on the address Teams reports. Redeeming the guest
+  // invitation is optional now, so a student may appear under either their
+  // Entra guest identity or the personal Microsoft account they signed in
+  // with. Accept both: guest identities first, then each enrolled student's
+  // own UniHub address as a fallback, without letting the fallback shadow a
+  // guest identity that already claims that address.
   const identities = await UserMeetingIdentity.findAll({ where: { provider: "teams", identityType: "student" } });
-  const byEmail = new Map(identities.map((identity) => [identity.email.toLowerCase(), identity]));
+  const byEmail = new Map(identities.map((identity) => [identity.email.toLowerCase(), identity.userId]));
+  const enrolled = await SessionEnrollment.findAll({
+    where: { sessionId },
+    include: [{ model: User, as: "student", attributes: ["id", "email"] }],
+  });
+  for (const item of enrolled) {
+    const email = String(item.student?.email || "").trim().toLowerCase();
+    if (email && !byEmail.has(email)) byEmail.set(email, item.studentId);
+  }
+
   let attendedCount = 0;
   for (const record of records) {
-    const identity = byEmail.get(attendanceEmail(record));
-    if (!identity) continue;
-    const enrollment = await SessionEnrollment.findOne({ where: { sessionId, studentId: identity.userId } });
+    const studentId = byEmail.get(attendanceEmail(record));
+    if (!studentId) continue;
+    const enrollment = await SessionEnrollment.findOne({ where: { sessionId, studentId } });
     if (!enrollment) continue;
     const intervals = (record.attendanceIntervals || []).map((item) => ({ joinDateTime: item.joinDateTime, leaveDateTime: item.leaveDateTime, durationInSeconds: item.durationInSeconds }));
     const seconds = intervals.reduce((sum, item) => sum + Number(item.durationInSeconds || 0), 0);
