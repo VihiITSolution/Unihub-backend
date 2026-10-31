@@ -70,6 +70,24 @@ async function detail(req, res, next) {
   } catch (error) { next(error); }
 }
 
+// Administrators may join any provisioned Teams session to moderate or assist.
+// Return the link only after the admin authorization middleware has run rather
+// than exposing it in the session list response.
+async function join(req, res, next) {
+  try {
+    const session = await LiveSession.findByPk(req.params.id, {
+      include: [{ model: LiveSessionMeeting, as: "meeting", attributes: ["joinUrl"] }],
+    });
+    if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
+    if (session.provider !== "teams") return res.status(400).json({ success: false, message: "Administrator joining is available for Microsoft Teams sessions only" });
+    if (!["scheduled", "live"].includes(session.status) || session.approvalStatus !== "approved" || session.providerStatus !== "ready") {
+      return res.status(409).json({ success: false, message: "This session is not ready to join" });
+    }
+    if (!session.meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });
+    res.json({ success: true, message: "Open Microsoft Teams to join the session", data: { joinUrl: session.meeting.joinUrl } });
+  } catch (error) { next(error); }
+}
+
 async function approve(req, res, next) {
   try {
     if (!provider.enabled()) return res.status(503).json({ success: false, message: "Teams live-session approvals are disabled by feature flag" });
@@ -223,4 +241,4 @@ async function conflict(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { list, calendar, statistics, detail, approve, reject, retry, syncAttendees, syncArtifacts, resendTutorInvitation, removeRecording, remove, health, conflict };
+module.exports = { list, calendar, statistics, detail, join, approve, reject, retry, syncAttendees, syncArtifacts, resendTutorInvitation, removeRecording, remove, health, conflict };

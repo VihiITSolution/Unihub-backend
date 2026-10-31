@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { sequelize, LiveSession, User, Course, CourseContent, TutorProfile, LiveSessionMeeting, MeetingOrganizerAccount } = require("../models");
+const { sequelize, LiveSession, User, Course, CourseContent, TutorProfile, LiveSessionMeeting, LiveSessionEvent, MeetingOrganizerAccount } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const provider = require("../services/liveSessionProviderService");
 const { publicSession, ownerSession } = require("../utils/liveSessionPresentation");
@@ -168,8 +168,23 @@ async function getMyLiveSessions(req, res, next) {
     const where = { tutorId: req.user.id };
     if (req.query.status) where.status = req.query.status;
     if (req.query.upcoming === "true") where.scheduledEndTime = { [Op.gt]: new Date() };
-    const rows = await LiveSession.findAll({ where, include: [...includes, { model: LiveSessionMeeting, as: "meeting" }], order: [["scheduledStartTime", "ASC"]] });
-    res.json({ success: true, data: { sessions: rows.map(ownerSession) } });
+    const rows = await LiveSession.findAll({
+      where,
+      include: [...includes, { model: LiveSessionMeeting, as: "meeting" }, { model: LiveSessionEvent, as: "events", attributes: ["type", "createdAt"] }],
+      order: [["scheduledStartTime", "ASC"]],
+    });
+    const sessions = rows.map((session) => {
+      const value = ownerSession(session);
+      const latestLifecycleEvent = [...(value.events || [])]
+        .filter((item) => item.type?.startsWith("session."))
+        .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))[0];
+      value.canRejoinTeams = value.provider === "teams" && Boolean(value.meeting?.hasJoinUrl) && (
+        value.status === "live" || (value.status === "ended" && latestLifecycleEvent?.type === "session.auto_finalized")
+      );
+      delete value.events;
+      return value;
+    });
+    res.json({ success: true, data: { sessions } });
   } catch (error) { next(error); }
 }
 
@@ -329,8 +344,21 @@ async function rejoinLiveSession(req, res, next) {
     const session = await LiveSession.findByPk(req.params.id);
     if (!session) return res.status(404).json({ success: false, message: "Live session not found" });
     if (!owns(session, req.user)) return res.status(403).json({ success: false, message: "Not authorized to join this session" });
-    if (session.status !== "live") return res.status(400).json({ success: false, message: "This Teams link is available only while the session is live" });
     if (session.provider !== "teams") return res.status(400).json({ success: false, message: "Rejoining is available for Microsoft Teams sessions only" });
+
+    if (session.status === "ended") {
+      const latestLifecycleEvent = await LiveSessionEvent.findOne({
+        where: { sessionId: session.id, type: { [Op.in]: ["session.auto_finalized", "session.ended"] } },
+        order: [["createdAt", "DESC"]],
+      });
+      if (latestLifecycleEvent?.type !== "session.auto_finalized") {
+        return res.status(400).json({ success: false, message: "This session was ended and its Teams link is no longer available" });
+      }
+      await session.update({ status: "live", actualEndTime: null });
+      await provider.event(session.id, req.user.id, "session.reopened_after_auto_finalize");
+    } else if (session.status !== "live") {
+      return res.status(400).json({ success: false, message: "This Teams link is available only while the session is live" });
+    }
 
     const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
     if (!meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });

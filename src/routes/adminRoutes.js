@@ -71,6 +71,7 @@ router.get("/live-sessions/health", authMiddleware, authorize("admin"), adminLiv
 router.get("/live-sessions/conflicts", authMiddleware, authorize("admin"), adminLiveSessions.conflict);
 router.post("/live-sessions", authMiddleware, authorize("admin"), auditAdminAction("live_session.created", "live_session", "Created a live session"), liveSessionController.createLiveSession);
 router.get("/live-sessions/:id", authMiddleware, authorize("admin"), adminLiveSessions.detail);
+router.post("/live-sessions/:id/join", authMiddleware, authorize("admin"), adminLiveSessions.join);
 router.put("/live-sessions/:id", authMiddleware, authorize("admin"), auditAdminAction("live_session.updated", "live_session", "Updated a live session"), liveSessionController.updateLiveSession);
 router.delete("/live-sessions/:id", authMiddleware, authorize("admin"), auditAdminAction("live_session.cancelled", "live_session", "Cancelled a live session"), liveSessionController.cancelLiveSession);
 router.delete("/live-sessions/:id/permanent", authMiddleware, authorize("admin"), auditAdminAction("live_session.deleted", "live_session", "Permanently deleted a live session"), adminLiveSessions.remove);

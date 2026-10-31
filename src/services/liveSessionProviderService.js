@@ -438,19 +438,11 @@ async function processOneJob() {
 }
 
 async function finalizeOverdueSessions() {
-  const sessions = await LiveSession.findAll({
-    where: {
-      provider: "teams", status: "live",
-      scheduledEndTime: { [Op.lt]: new Date(Date.now() - 30 * 60_000) },
-    },
-    limit: 20,
-  });
-  for (const session of sessions) {
-    await session.update({ status: "ended", actualEndTime: session.actualEndTime || new Date() });
-    await event(session.id, null, "session.auto_finalized");
-    await enqueue(session.id, "artifact_sync");
-  }
-  return sessions.length;
+  // A scheduled end time is an estimate, not an instruction to close a Teams
+  // session. Tutors must be able to return after accidentally leaving Teams,
+  // including when a lesson runs longer than planned. Sessions now remain live
+  // until their tutor or an administrator explicitly ends or cancels them.
+  return 0;
 }
 
 async function notifySessionUsers(sessionId, title, message) {
