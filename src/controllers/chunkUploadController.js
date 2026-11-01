@@ -74,13 +74,19 @@ const completeChunkedUpload = async (req, res, next) => {
     if (type !== "video") {
       return res.status(400).json({ success: false, message: "Chunked uploads only support videos." });
     }
-    const declaration = await YouTubeRightsDeclaration.findOne({ where: { userId: course.tutorId } });
-    if (!declaration) {
-      return res.status(428).json({
-        success: false,
-        code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
-        message: "Sign the one-time rights declaration before your first video upload or YouTube link.",
-      });
+    // Mirrors addCourseContent: staff may upload a tutor's supplied material
+    // while moderating a course. The tutor's declaration is still required for
+    // tutor-initiated uploads, but an admin has no way to sign on the tutor's
+    // behalf, so enforcing it here only blocks moderation.
+    if (!isAdmin) {
+      const declaration = await YouTubeRightsDeclaration.findOne({ where: { userId: course.tutorId } });
+      if (!declaration) {
+        return res.status(428).json({
+          success: false,
+          code: "YOUTUBE_RIGHTS_DECLARATION_REQUIRED",
+          message: "Sign the one-time rights declaration before your first video upload or YouTube link.",
+        });
+      }
     }
 
     const n = parseInt(totalChunks, 10);

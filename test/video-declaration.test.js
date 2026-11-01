@@ -85,6 +85,25 @@ test("chunk completion cannot bypass the first-video declaration", async (t) => 
   assert.equal(upload.mock.callCount(), 0);
 });
 
+test("chunk completion lets an admin upload without the tutor's declaration", async (t) => {
+  t.mock.method(models.Course, "findByPk", async () => ({ id: 5, tutorId: 7 }));
+  t.mock.method(models.YouTubeRightsDeclaration, "findOne", async () => {
+    throw new Error("admin upload must not check the tutor's declaration");
+  });
+  const { completeChunkedUpload } = controller(t, "chunkUploadController");
+  const res = response();
+  await completeChunkedUpload(
+    {
+      user: { id: 1, firstName: "Site", lastName: "Admin", roles: ["admin"] },
+      params: { courseId: 5 },
+      body: { uploadId: "test-only", totalChunks: 1, fileName: "video.mp4", title: "Lesson", type: "video" },
+    },
+    res,
+    () => {},
+  );
+  assert.notEqual(res.code, 428);
+});
+
 test("chunk completion rejects a tutor uploading to someone else's course", async (t) => {
   t.mock.method(models.Course, "findByPk", async () => ({ id: 5, tutorId: 99 }));
   const { completeChunkedUpload } = controller(t, "chunkUploadController");
