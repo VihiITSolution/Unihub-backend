@@ -43,8 +43,35 @@ if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
-// Security middleware
-app.use(helmet());
+// Security middleware. helmet()'s defaults already cover CSP, HSTS,
+// X-Content-Type-Options, X-Frame-Options and Referrer-Policy; the options
+// below only adjust what it leaves out or sets too loosely for an API.
+app.use(
+  helmet({
+    // Nothing should frame the API. helmet defaults to 'self'.
+    frameguard: { action: "deny" },
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: { "frame-ancestors": ["'none'"] },
+    },
+    // Add preload to the default max-age and includeSubDomains. Only takes
+    // effect over HTTPS, which Nginx terminates in production.
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+  }),
+);
+
+// helmet does not set Permissions-Policy. The API needs none of these.
+app.use((req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
+  );
+  next();
+});
 
 // CORS configuration (shared with Socket.io - see config/cors.js)
 app.use(
@@ -56,9 +83,20 @@ app.use(
   }),
 );
 
-// Body parser middleware
-app.use(express.json({ limit: "5gb" }));
-app.use(express.urlencoded({ extended: true, limit: "5gb" }));
+// Body parser middleware.
+//
+// These limits apply to JSON and form-encoded bodies only. Every upload route
+// uses multer, which parses multipart itself and enforces its own per-route
+// fileSize, so the previous 5gb ceiling here guarded nothing: it only meant
+// any unauthenticated request to any endpoint could make the process buffer
+// gigabytes in memory before a handler ever ran.
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "2mb" }));
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: process.env.URLENCODED_BODY_LIMIT || "1mb",
+  }),
+);
 
 // Reject XSS/SQL-injection-style payloads in body/query/params before they
 // reach any route handler
@@ -89,15 +127,19 @@ app.get("/health", (req, res) => {
   });
 });
 
-// API Documentation
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    explorer: true,
-    customSiteTitle: "UniHub API Documentation",
-  }),
-);
+// API Documentation. Publishing the full API surface, including request
+// shapes for admin and payment routes, is free reconnaissance; it is served
+// outside production only. Set ENABLE_API_DOCS=true to expose it deliberately.
+if (process.env.NODE_ENV !== "production" || process.env.ENABLE_API_DOCS === "true") {
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      explorer: true,
+      customSiteTitle: "UniHub API Documentation",
+    }),
+  );
+}
 
 // API Routes
 app.use("/api/auth", authRoutes);

@@ -28,7 +28,18 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  const statusCode = err.statusCode || 500;
+  // body-parser rejects an oversized body with type 'entity.too.large' and
+  // sets `status`, not `statusCode`. Without this it is reported as a 500,
+  // which reads as a server fault rather than a request the client can fix.
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      message: 'Request body is too large.'
+    });
+  }
+
+  // Express sets `status` on its own errors; our own code sets `statusCode`.
+  const statusCode = err.statusCode || err.status || 500;
   const message = err.message || 'Internal server error';
 
   res.status(statusCode).json({
