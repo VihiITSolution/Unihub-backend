@@ -19,6 +19,24 @@ const auditAdminAction = (action, targetType, summary) => (req, res, next) => {
         "approved",
         "assignToMe",
       ];
+      // Never persist a credential or token that reached us in a query
+      // string. Auth data belongs in a POST body, but a mis-built link or a
+      // form that submitted before hydration can still put it in the URL, and
+      // the audit log is long-lived storage.
+      const SENSITIVE_QUERY_KEYS = /^(password|pass|pwd|token|access_token|refresh_token|secret|client_secret|api[-_]?key|code|otp|auth|authorization|session|email|username)$/i;
+      const redactUrl = (originalUrl) => {
+        const raw = String(originalUrl || "");
+        const split = raw.indexOf("?");
+        if (split === -1) return raw.slice(0, 500);
+        const path = raw.slice(0, split);
+        const params = new URLSearchParams(raw.slice(split + 1));
+        for (const key of [...params.keys()]) {
+          if (SENSITIVE_QUERY_KEYS.test(key)) params.set(key, "[redacted]");
+        }
+        const query = params.toString();
+        return (query ? `${path}?${query}` : path).slice(0, 500);
+      };
+
       const changes = Object.fromEntries(
         allowedDetailKeys
           .filter((key) => req.body?.[key] !== undefined)
@@ -33,7 +51,7 @@ const auditAdminAction = (action, targetType, summary) => (req, res, next) => {
         summary: typeof summary === "function" ? summary(req) : summary,
         metadata: {
           method: req.method,
-          path: req.originalUrl,
+          path: redactUrl(req.originalUrl),
           statusCode: res.statusCode,
           ...(Array.isArray(req.body?.ticketIds)
             ? { itemCount: Math.min(req.body.ticketIds.length, 50) }
