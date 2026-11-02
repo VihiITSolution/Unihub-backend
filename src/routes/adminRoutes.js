@@ -44,6 +44,7 @@ const {
   getSystemStatus,
 } = require("../controllers/adminOperationsController");
 const adminLiveSessions = require("../controllers/adminLiveSessionController");
+const videoUploadQueue = require("../services/videoUploadQueue.service");
 const liveSessionController = require("../controllers/liveSessionController");
 const affiliateAdmin = require("../controllers/adminAffiliateController");
 const microsoftDrive = require("../controllers/microsoftDriveController");
@@ -63,6 +64,15 @@ router.get("/affiliate/payouts", authMiddleware, authorize("admin"), affiliateAd
 router.get("/affiliate/payouts/:id", authMiddleware, authorize("admin"), affiliateAdmin.payoutDetail);
 router.post("/affiliate/payouts/:id/review", authMiddleware, authorize("admin"), auditAdminAction("affiliate.payout_reviewed", "affiliate_payout", "Reviewed an affiliate payout"), affiliateAdmin.reviewPayout);
 router.post("/affiliate/payouts/:id/paid", authMiddleware, authorize("admin"), auditAdminAction("affiliate.payout_paid", "affiliate_payout", "Marked an affiliate payout paid"), affiliateAdmin.markPayoutPaid);
+
+// How many videos are waiting on YouTube quota, and when it next resets.
+router.get("/video-upload-queue", authMiddleware, authorize("admin"), async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await videoUploadQueue.queueSummary() });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/live-sessions", authMiddleware, authorize("admin"), adminLiveSessions.list);
 router.get("/live-sessions/calendar", authMiddleware, authorize("admin"), adminLiveSessions.calendar);

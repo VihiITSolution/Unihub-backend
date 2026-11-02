@@ -31,6 +31,13 @@ const CourseContent = sequelize.define(
       allowNull: false,
       comment: "YouTube URL for videos, file path for PDFs",
     },
+    uploadStatus: {
+      type: DataTypes.ENUM("ready", "queued", "failed"),
+      allowNull: false,
+      defaultValue: "ready",
+      field: "upload_status",
+      comment: "queued while a video waits for YouTube quota; see video_upload_jobs",
+    },
     youtubeVideoId: {
       type: DataTypes.STRING(50),
       allowNull: true,

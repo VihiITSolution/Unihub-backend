@@ -120,6 +120,7 @@ jobs:
 
             # Run the idempotent schema migration before exposing registration.
             docker exec unihub-backend npm run migrate:sms-auth
+            docker exec unihub-backend npm run migrate:youtube-queue
 
             for attempt in $(seq 1 40); do
               if [ "$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' unihub-backend)" = "healthy" ]; then

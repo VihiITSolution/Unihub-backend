@@ -5,6 +5,9 @@ const {
   YouTubeRightsDeclaration,
 } = require("../models");
 const youtubeUploader = require("../config/youtube");
+const quota = require("../services/youtubeQuota.service");
+const videoUploadQueue = require("../services/videoUploadQueue.service");
+const { getYouTubeVideoId } = require("../utils/youtubeUrl");
 const { recordQualifyingVideoActivity } = require("../services/affiliate.service");
 const { syncCourseDuration } = require("../services/courseDuration.service");
 const { storeSupportLink, readSupportLink, presentCourseContent } = require("../services/courseSupportMaterial.service");
@@ -140,6 +143,9 @@ const addCourseContent = async (req, res, next) => {
     let url;
     let storedType = type;
     let youtubeVideoId = null;
+    let uploadStatus = "ready";
+    let queuedUntil = null;
+    let queuedUpload = null;
     let youtubeRightsDeclarationId = null;
     let youtubeRightsConfirmedAt = null;
 
@@ -174,30 +180,43 @@ const addCourseContent = async (req, res, next) => {
       const videoTitle = `${title} - Course ${courseId}`;
       const videoDescription = `Course lesson: ${title}`;
 
-      try {
-        const youtubeUrl = await youtubeUploader.uploadVideo(
-          videoPath,
-          videoTitle,
-          videoDescription,
-        );
+      const alreadyExhausted = quota.quotaAvailableAt();
+      if (alreadyExhausted) {
+        // Quota is known to be spent, so skip the API call that would only
+        // rediscover it. The file is on disk and served locally meanwhile.
+        url = videoUploadQueue.localUrlFor(videoPath);
+        uploadStatus = "queued";
+        queuedUntil = alreadyExhausted;
+        queuedUpload = { filePath: videoPath, title: videoTitle, description: videoDescription };
+      } else {
+        try {
+          const youtubeUrl = await youtubeUploader.uploadVideo(
+            videoPath,
+            videoTitle,
+            videoDescription,
+          );
 
-        // Extract video ID from YouTube URL
-        if (youtubeUrl.includes("youtube.com/watch?v=")) {
-          youtubeVideoId = youtubeUrl.split("v=")[1]?.split("&")[0];
-        } else if (youtubeUrl.includes("youtu.be/")) {
-          youtubeVideoId = youtubeUrl.split("youtu.be/")[1]?.split("?")[0];
+          youtubeVideoId = getYouTubeVideoId(youtubeUrl);
+          url = buildPrivacyEmbedUrl(youtubeVideoId) || youtubeUrl;
+          console.log("Video uploaded to YouTube:", youtubeUrl);
+        } catch (uploadError) {
+          if (quota.classifyUploadError(uploadError) === "quota") {
+            // Out of daily quota. Keep the uploaded file and publish it after
+            // the reset instead of making the tutor upload again tomorrow.
+            queuedUntil = quota.markQuotaExhausted();
+            url = videoUploadQueue.localUrlFor(videoPath);
+            uploadStatus = "queued";
+            queuedUpload = { filePath: videoPath, title: videoTitle, description: videoDescription };
+          } else {
+            console.error("YouTube upload failed:", uploadError);
+            return res.status(500).json({
+              success: false,
+              message:
+                uploadError.message ||
+                "Failed to upload video to YouTube. Please try again.",
+            });
+          }
         }
-
-        url = buildPrivacyEmbedUrl(youtubeVideoId) || youtubeUrl;
-        console.log("Video uploaded to YouTube:", youtubeUrl);
-      } catch (uploadError) {
-        console.error("YouTube upload failed:", uploadError);
-        return res.status(500).json({
-          success: false,
-          message:
-            uploadError.message ||
-            "Failed to upload video to YouTube. Please try again.",
-        });
       }
     } else if (req.body.url) {
       // Use provided URL (for PDFs or if video URL is manually provided).
@@ -257,19 +276,29 @@ const addCourseContent = async (req, res, next) => {
       type: storedType,
       url,
       youtubeVideoId,
+      uploadStatus,
       youtubeRightsDeclarationId,
       youtubeRightsConfirmedAt,
       duration: duration || null,
       order: order || 0,
       isPreview: isPreview === "true" || isPreview === true ? true : false,
     });
+    if (queuedUpload) {
+      await videoUploadQueue.enqueue({ contentId: content.id, ...queuedUpload });
+    }
     await recordQualifyingVideoActivity(course, content);
     await syncCourseDuration(course.id);
 
     res.status(201).json({
       success: true,
-      message: "Course content added successfully",
-      data: { content: sanitizeContentForClient(content) },
+      message: uploadStatus === "queued"
+        ? "Video saved and queued for YouTube. The daily upload quota is used up; it will publish automatically after the quota resets."
+        : "Course content added successfully",
+      data: {
+        content: sanitizeContentForClient(content),
+        uploadStatus,
+        quotaResetsAt: queuedUntil,
+      },
     });
   } catch (error) {
     next(error);

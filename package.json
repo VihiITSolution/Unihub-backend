@@ -17,6 +17,7 @@
     "migrate:affiliate-deadline": "node src/migrations/extend-affiliate-signup-deadline.js",
     "migrate:course-support-materials": "node src/migrations/20261027-course-support-material-links.js",
     "migrate:microsoft-drive": "node src/migrations/20261027-microsoft-drive-connections.js",
+    "migrate:youtube-queue": "node src/migrations/20261102-youtube-upload-queue.js",
     "seed": "node src/migrations/seed.js",
     "test": "node --test test/*.test.js"
   },

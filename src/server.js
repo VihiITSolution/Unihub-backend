@@ -15,6 +15,7 @@ const addVendorAffiliateActivity = require("./migrations/add-vendor-affiliate-ac
 const extendAffiliateSignupDeadline = require("./migrations/extend-affiliate-signup-deadline");
 const { seedEligibleAffiliateAccounts } = require("./services/affiliate.service");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
+const { startVideoUploadWorker } = require("./workers/videoUploadWorker");
 const { deleteExpiredChallenges } = require("./services/verification.service");
 
 const PORT = process.env.PORT || 3000;
@@ -225,6 +226,7 @@ const startServer = async () => {
     initSocket(io);
     app.set("io", io);
     startLiveSessionProviderWorker();
+    startVideoUploadWorker();
     // Verification challenges contain only short-lived state. Cleanup is best-effort
     // and intentionally never blocks application startup.
     deleteExpiredChallenges().catch((error) => console.warn("Verification cleanup failed:", error.message));

@@ -1,6 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const quota = require("../services/youtubeQuota.service");
+const videoUploadQueue = require("../services/videoUploadQueue.service");
+const { getYouTubeVideoId } = require("../utils/youtubeUrl");
 const { CourseContent, Course, YouTubeRightsDeclaration } = require("../models");
 const youtubeUploader = require("../config/youtube");
 const { recordQualifyingVideoActivity } = require("../services/affiliate.service");
@@ -112,31 +115,44 @@ const completeChunkedUpload = async (req, res, next) => {
 
     cleanup();
 
+    const videoTitle = `${title} - Course ${courseId}`;
+    const videoDescription = `Course lesson: ${title}`;
+
     // Upload assembled file to YouTube
     let url;
     let youtubeVideoId = null;
+    let uploadStatus = "ready";
+    let queuedUntil = null;
 
-    try {
-      const ytUrl = await youtubeUploader.uploadVideo(
-        assembledPath,
-        `${title} - Course ${courseId}`,
-        `Course lesson: ${title}`,
-      );
-
-      if (ytUrl.includes("youtube.com/watch?v=")) {
-        youtubeVideoId = ytUrl.split("v=")[1]?.split("&")[0];
-      } else if (ytUrl.includes("youtu.be/")) {
-        youtubeVideoId = ytUrl.split("youtu.be/")[1]?.split("?")[0];
+    const alreadyExhausted = quota.quotaAvailableAt();
+    if (alreadyExhausted) {
+      // Quota is known to be spent, so do not spend an API call rediscovering
+      // it. Serve the assembled file locally and queue the move to YouTube.
+      url = videoUploadQueue.localUrlFor(assembledPath);
+      uploadStatus = "queued";
+      queuedUntil = alreadyExhausted;
+    } else {
+      try {
+        const ytUrl = await youtubeUploader.uploadVideo(assembledPath, videoTitle, videoDescription);
+        youtubeVideoId = getYouTubeVideoId(ytUrl);
+        url = youtubeVideoId ? buildPrivacyEmbedUrl(youtubeVideoId) : ytUrl;
+      } catch (ytError) {
+        if (quota.classifyUploadError(ytError) === "quota") {
+          // Out of daily quota. The video is assembled and on disk, so keep it
+          // and retry after the quota resets rather than discarding the
+          // tutor's upload and asking them to do it again tomorrow.
+          queuedUntil = quota.markQuotaExhausted();
+          url = videoUploadQueue.localUrlFor(assembledPath);
+          uploadStatus = "queued";
+        } else {
+          console.error("YouTube upload failed:", ytError.message);
+          try { fs.unlinkSync(assembledPath); } catch {}
+          return res.status(500).json({
+            success: false,
+            message: ytError.message || "Failed to upload video to YouTube.",
+          });
+        }
       }
-
-      url = youtubeVideoId ? buildPrivacyEmbedUrl(youtubeVideoId) : ytUrl;
-    } catch (ytError) {
-      console.error("YouTube upload failed:", ytError.message);
-      try { fs.unlinkSync(assembledPath); } catch {}
-      return res.status(500).json({
-        success: false,
-        message: ytError.message || "Failed to upload video to YouTube.",
-      });
     }
 
     const content = await CourseContent.create({
@@ -145,14 +161,30 @@ const completeChunkedUpload = async (req, res, next) => {
       type,
       url,
       youtubeVideoId,
+      uploadStatus,
       duration: duration ? parseInt(duration, 10) : null,
       order: order ? parseInt(order, 10) : 0,
       isPreview: isPreview === "true" || isPreview === true,
     });
+
+    if (uploadStatus === "queued") {
+      await videoUploadQueue.enqueue({
+        contentId: content.id,
+        filePath: assembledPath,
+        title: videoTitle,
+        description: videoDescription,
+      });
+    }
     await recordQualifyingVideoActivity(course, content);
     await syncCourseDuration(course.id);
 
-    res.status(201).json({ success: true, message: "Course content added successfully", data: { content } });
+    res.status(201).json({
+      success: true,
+      message: uploadStatus === "queued"
+        ? "Video saved and queued for YouTube. The daily upload quota is used up; it will publish automatically after the quota resets."
+        : "Course content added successfully",
+      data: { content, uploadStatus, quotaResetsAt: queuedUntil },
+    });
   } catch (error) {
     cleanup();
     next(error);

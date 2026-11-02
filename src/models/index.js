@@ -2,6 +2,7 @@ const sequelize = require("../config/sequelize");
 const User = require("./User");
 const Course = require("./Course");
 const CourseContent = require("./CourseContent");
+const VideoUploadJob = require("./VideoUploadJob");
 const Enrollment = require("./Enrollment");
 const Payment = require("./Payment");
 const MarketplaceItem = require("./MarketplaceItem");
@@ -368,6 +369,7 @@ module.exports = {
   Follow,
   Course,
   CourseContent,
+  VideoUploadJob,
   Enrollment,
   Payment,
   MarketplaceItem,
