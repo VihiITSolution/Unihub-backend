@@ -1,4 +1,5 @@
 const { User } = require("../models");
+const { sendTestEmail, deliveryError } = require("../services/adminLiveSessionNotification.service");
 
 const LIVE_SESSION_EVENTS = [
   "request_submitted",
@@ -110,4 +111,22 @@ async function update(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { list, add, update, LIVE_SESSION_EVENTS };
+async function sendNotificationTest(req, res, next) {
+  try {
+    const user = await User.findByPk(req.params.id, {
+      attributes: ["id", "firstName", "email", "roles", "primaryRole", "isActive"],
+    });
+    if (!user || !isAdministrator(user)) return res.status(404).json({ success: false, message: "Administrator not found." });
+    if (!user.isActive) return res.status(409).json({ success: false, message: "Activate this administrator before sending a test email." });
+
+    try {
+      await sendTestEmail(user);
+    } catch (error) {
+      console.error(`Failed to send administrator notification test email to ${user.id} (${user.email}): ${deliveryError(error)}`);
+      return res.status(502).json({ success: false, message: "Email could not be delivered. Check the backend logs and Resend sender-domain settings." });
+    }
+    res.json({ success: true, message: `Test email sent to ${user.email}.` });
+  } catch (error) { next(error); }
+}
+
+module.exports = { list, add, update, sendNotificationTest, LIVE_SESSION_EVENTS };

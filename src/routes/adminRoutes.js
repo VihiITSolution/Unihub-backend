@@ -86,6 +86,7 @@ router.delete("/live-sessions/:id/recording", authMiddleware, authorize("admin")
 // Administrator access and operational-notification settings.
 router.get("/administrators", authMiddleware, authorize("admin"), administrators.list);
 router.post("/administrators", authMiddleware, authorize("admin"), auditAdminAction("administrator.granted", "user", "Granted administrator access"), administrators.add);
+router.post("/administrators/:id/test-email", authMiddleware, authorize("admin"), auditAdminAction("administrator.notification_test_sent", "user", "Sent administrator notification test email"), administrators.sendNotificationTest);
 router.put("/administrators/:id", authMiddleware, authorize("admin"), auditAdminAction("administrator.updated", "user", "Updated administrator access or notifications"), administrators.update);
 
 /**
