@@ -681,7 +681,7 @@ const submitForReview = async (req, res, next) => {
       `“${course.title}” has been submitted for course moderation.`,
       "/courses/pending",
       { courseId: course.id, tutorId: course.tutorId },
-      { email: true },
+      { emailEvent: "course" },
     ).catch((notificationError) => console.error("Failed to notify admins about course review:", notificationError.message));
 
     res.status(200).json({

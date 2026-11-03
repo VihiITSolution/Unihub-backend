@@ -129,7 +129,7 @@ exports.createBoardingPlace = async (req, res) => {
         `“${boardingPlace.title}” has been submitted for boarding moderation.`,
         "/boarding",
         { boardingPlaceId: boardingPlace.id, vendorId: boardingPlace.vendorId },
-        { email: true },
+        { emailEvent: "boarding" },
       ).catch((notificationError) => console.error("Failed to notify admins about boarding listing:", notificationError.message));
     }
 
@@ -198,7 +198,7 @@ exports.payForListing = async (req, res) => {
       approvalStatus: 'pending' // Send for admin approval
     });
 
-    notifyActiveAdmins("Boarding listing awaiting review", `“${boardingPlace.title}” has been submitted for boarding moderation.`, "/boarding", { boardingPlaceId: boardingPlace.id, vendorId: userId }, { email: true })
+    notifyActiveAdmins("Boarding listing awaiting review", `“${boardingPlace.title}” has been submitted for boarding moderation.`, "/boarding", { boardingPlaceId: boardingPlace.id, vendorId: userId }, { emailEvent: "boarding" })
       .catch((error) => console.error("Failed to notify admins about boarding listing:", error.message));
 
     // TODO: Create payment record in Payment model

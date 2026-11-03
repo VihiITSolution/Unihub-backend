@@ -1,5 +1,6 @@
 const { Notification, User } = require("../models");
 const { sendEmail } = require("../services/resend.service");
+const { APPROVAL_EVENTS, wantsApprovalEmail } = require("../services/adminApprovalPreferences");
 
 /**
  * Get user's notifications
@@ -186,17 +187,18 @@ const createNotification = async (
  * This is deliberately best-effort; an unread-notification failure must never
  * prevent a student or vendor from completing their request.
  */
-const notifyActiveAdmins = async (title, message, link = null, metadata = null, { email = false } = {}) => {
+const notifyActiveAdmins = async (title, message, link = null, metadata = null, { emailEvent = null } = {}) => {
+  if (emailEvent && !APPROVAL_EVENTS.includes(emailEvent)) throw new Error(`Unknown approval notification event: ${emailEvent}`);
   const users = await User.findAll({
     where: { isActive: true },
-    attributes: ["id", "firstName", "email", "roles", "primaryRole"],
+    attributes: ["id", "firstName", "email", "roles", "primaryRole", "notificationPrefs"],
   });
   const admins = users.filter((user) => user.primaryRole === "admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
 
   const adminUrl = String(process.env.ADMIN_APP_URL || "https://unihub.lk/admin").replace(/\/+$/, "");
   await Promise.all(admins.map(async (admin) => {
     const tasks = [createNotification(admin.id, "general", title, message, link, metadata)];
-    if (email && admin.email) {
+    if (emailEvent && admin.email && wantsApprovalEmail(admin, emailEvent)) {
       tasks.push(sendEmail(admin.email, `[UniHub] ${title}`, [
         `Hi ${admin.firstName || "there"},`, "", message, "",
         link ? `Review in UniHub Admin: ${adminUrl}/${link.replace(/^\/+/, "")}` : `Open UniHub Admin: ${adminUrl}`,

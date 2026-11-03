@@ -12,7 +12,7 @@ const MINIMUM_QUALIFYING_VIDEO_MINUTES = 20;
 function notifyReferralReviewAfterCommit(transaction, referral) {
   transaction.afterCommit(() => {
     const { notifyActiveAdmins } = require("../controllers/notificationController");
-    notifyActiveAdmins("Affiliate referral awaiting review", "An affiliate referral needs administrator review.", "/affiliate", { referralId: referral.id }, { email: true })
+    notifyActiveAdmins("Affiliate referral awaiting review", "An affiliate referral needs administrator review.", "/affiliate", { referralId: referral.id }, { emailEvent: "affiliate_referral" })
       .catch((error) => console.error("Failed to notify admins about affiliate referral:", error.message));
   });
 }

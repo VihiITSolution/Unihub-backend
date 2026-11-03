@@ -8,7 +8,7 @@ const { notifyActiveAdmins } = require('./notificationController');
 
 function notifyMarketplaceReview(item) {
   if (item.approvalStatus !== 'pending') return;
-  notifyActiveAdmins('Marketplace listing awaiting review', `“${item.title}” has been submitted for marketplace moderation.`, '/marketplace', { marketplaceItemId: item.id, sellerId: item.sellerId }, { email: true })
+  notifyActiveAdmins('Marketplace listing awaiting review', `“${item.title}” has been submitted for marketplace moderation.`, '/marketplace', { marketplaceItemId: item.id, sellerId: item.sellerId }, { emailEvent: 'marketplace' })
     .catch((error) => console.error('Failed to notify admins about marketplace listing:', error.message));
 }
 

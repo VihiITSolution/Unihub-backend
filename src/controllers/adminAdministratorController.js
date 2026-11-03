@@ -1,5 +1,6 @@
 const { User } = require("../models");
 const { sendTestEmail, deliveryError } = require("../services/adminLiveSessionNotification.service");
+const { APPROVAL_EVENTS } = require("../services/adminApprovalPreferences");
 
 const LIVE_SESSION_EVENTS = [
   "request_submitted",
@@ -30,7 +31,7 @@ async function activeAdministratorCount(excludingUserId = null) {
   return users.filter((user) => user.id !== excludingUserId && isAdministrator(user)).length;
 }
 
-function sanitizeNotificationPrefs(input, current) {
+function sanitizeNotificationPrefs(input, current, eventTypes, preferenceKey) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     const error = new Error("Notification settings must be an object.");
     error.statusCode = 400;
@@ -43,7 +44,7 @@ function sanitizeNotificationPrefs(input, current) {
     throw error;
   }
   const events = {};
-  for (const event of LIVE_SESSION_EVENTS) {
+  for (const event of eventTypes) {
     if (typeof input.events?.[event] !== "boolean") {
       const error = new Error(`Choose whether to receive ${event} emails.`);
       error.statusCode = 400;
@@ -53,7 +54,7 @@ function sanitizeNotificationPrefs(input, current) {
   }
   return {
     ...(current && typeof current === "object" ? current : {}),
-    adminLiveSessions: { emailEnabled, events },
+    [preferenceKey]: { emailEnabled, events },
   };
 }
 
@@ -63,7 +64,7 @@ async function list(req, res, next) {
       attributes: ["id", "firstName", "lastName", "email", "roles", "primaryRole", "isActive", "notificationPrefs", "createdAt", "lastLogin"],
       order: [["firstName", "ASC"], ["lastName", "ASC"]],
     });
-    res.json({ success: true, data: { administrators: users.filter(isAdministrator).map(publicAdministrator), liveSessionEvents: LIVE_SESSION_EVENTS } });
+    res.json({ success: true, data: { administrators: users.filter(isAdministrator).map(publicAdministrator), liveSessionEvents: LIVE_SESSION_EVENTS, approvalEvents: APPROVAL_EVENTS } });
   } catch (error) { next(error); }
 }
 
@@ -86,8 +87,8 @@ async function update(req, res, next) {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user || !isAdministrator(user)) return res.status(404).json({ success: false, message: "Administrator not found." });
-    const { isActive, hasAdminAccess, liveSessionNotifications } = req.body;
-    if (isActive === undefined && hasAdminAccess === undefined && liveSessionNotifications === undefined) {
+    const { isActive, hasAdminAccess, liveSessionNotifications, approvalNotifications } = req.body;
+    if (isActive === undefined && hasAdminAccess === undefined && liveSessionNotifications === undefined && approvalNotifications === undefined) {
       return res.status(400).json({ success: false, message: "Provide an access or notification setting to update." });
     }
     if (isActive !== undefined && typeof isActive !== "boolean") return res.status(400).json({ success: false, message: "Active status must be true or false." });
@@ -100,12 +101,15 @@ async function update(req, res, next) {
       if (remaining < 1) return res.status(400).json({ success: false, message: "At least one active administrator must remain." });
     }
 
+    let prefs = user.notificationPrefs;
+    if (liveSessionNotifications !== undefined) prefs = sanitizeNotificationPrefs(liveSessionNotifications, prefs, LIVE_SESSION_EVENTS, "adminLiveSessions");
+    if (approvalNotifications !== undefined) prefs = sanitizeNotificationPrefs(approvalNotifications, prefs, APPROVAL_EVENTS, "adminApprovals");
     if (isActive !== undefined) user.isActive = isActive;
     if (hasAdminAccess === false) {
       user.roles = (Array.isArray(user.roles) ? user.roles : []).filter((role) => role !== "admin");
       user.primaryRole = user.roles.includes("tutor") ? "tutor" : user.roles.includes("vendor") ? "vendor" : "student";
     }
-    if (liveSessionNotifications !== undefined) user.notificationPrefs = sanitizeNotificationPrefs(liveSessionNotifications, user.notificationPrefs);
+    if (liveSessionNotifications !== undefined || approvalNotifications !== undefined) user.notificationPrefs = prefs;
     await user.save();
     res.json({ success: true, message: "Administrator updated.", data: { administrator: publicAdministrator(user) } });
   } catch (error) { next(error); }
