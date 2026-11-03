@@ -6,9 +6,9 @@ const { calculateExpirationDate } = require('./marketplaceController');
 const { notifyApprovalByEmail } = require('../services/approvalEmail.service');
 const { notifyActiveAdmins } = require('./notificationController');
 
-function notifyMarketplaceReview(item) {
+async function notifyMarketplaceReview(item) {
   if (item.approvalStatus !== 'pending') return;
-  notifyActiveAdmins('Marketplace listing awaiting review', `“${item.title}” has been submitted for marketplace moderation.`, '/marketplace', { marketplaceItemId: item.id, sellerId: item.sellerId }, { emailEvent: 'marketplace' })
+  await notifyActiveAdmins('Marketplace listing awaiting review', `“${item.title}” has been submitted for marketplace moderation.`, '/marketplace', { marketplaceItemId: item.id, sellerId: item.sellerId }, { emailEvent: 'marketplace' })
     .catch((error) => console.error('Failed to notify admins about marketplace listing:', error.message));
 }
 
@@ -340,7 +340,7 @@ const webhookPayHere = async (req, res) => {
       item.expiresAt = calculateExpirationDate();
       // Keep approval status as pending for admin review
       await item.save();
-      if (!wasPaid) notifyMarketplaceReview(item);
+      if (!wasPaid) await notifyMarketplaceReview(item);
     }
     
     console.log(`PayHere payment ${paymentInfo.status} for order ${paymentInfo.orderId}`);
@@ -406,7 +406,7 @@ const webhookHelaPay = async (req, res) => {
       item.expiresAt = calculateExpirationDate();
       // Keep approval status as pending for admin review
       await item.save();
-      if (!wasPaid) notifyMarketplaceReview(item);
+      if (!wasPaid) await notifyMarketplaceReview(item);
     }
     
     console.log(`HelaPay payment ${paymentInfo.status} for transaction ${paymentInfo.transactionId}`);
@@ -490,7 +490,7 @@ const verifyBankTransfer = async (req, res, next) => {
       item.expiresAt = calculateExpirationDate();
       // Keep approval status as pending for admin review
       await item.save();
-      if (!wasPaid) notifyMarketplaceReview(item);
+      if (!wasPaid) await notifyMarketplaceReview(item);
     }
 
     res.status(200).json({

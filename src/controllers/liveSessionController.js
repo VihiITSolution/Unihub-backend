@@ -130,7 +130,7 @@ async function createLiveSession(req, res, next) {
     });
     if (admin) await provider.enqueue(session.id, "provision", null, "initial");
     if (!admin) {
-      notifyAdministrators({
+      await notifyAdministrators({
         event: "request_submitted",
         title: "Live session needs approval",
         message: `${session.title} was submitted by ${tutor.firstName} ${tutor.lastName}.`,
@@ -273,7 +273,7 @@ async function updateLiveSession(req, res, next) {
     });
     if (session.provider === "teams" && session.approvalStatus === "approved") await provider.enqueue(session.id, "attendee_sync");
     if (wasRejected) {
-      notifyAdministrators({
+      await notifyAdministrators({
         event: "request_submitted",
         title: "Live session resubmitted",
         message: `${session.title} was updated and resubmitted for approval.`,
@@ -283,7 +283,7 @@ async function updateLiveSession(req, res, next) {
     }
     if (session.approvalStatus === "approved" && scheduleChanged) {
       await provider.notifySessionUsers(session.id, "Live session rescheduled", `${session.title} now starts at ${new Date(session.scheduledStartTime).toISOString()}.`);
-      notifyAdministrators({
+      await notifyAdministrators({
         event: "schedule_changed",
         title: "Live session rescheduled",
         message: `${session.title} has a new schedule.`,
@@ -305,7 +305,7 @@ async function cancelLiveSession(req, res, next) {
     await provider.event(session.id, req.user.id, "session.cancelled", { reason: req.body?.reason || null });
     if (session.provider === "teams") await provider.enqueue(session.id, "cancel");
     await provider.notifySessionUsers(session.id, "Live session cancelled", `${session.title} has been cancelled.`);
-    notifyAdministrators({
+    await notifyAdministrators({
       event: "cancelled",
       title: "Live session cancelled",
       message: `${session.title} was cancelled.`,

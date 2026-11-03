@@ -165,7 +165,7 @@ const createListing = async (req, res, next) => {
     });
     if (item.approvalStatus === "approved") await recordApprovedActivity(item.sellerId, "marketplace", item.id);
     if (item.approvalStatus === "pending" && item.isPaid) {
-      notifyActiveAdmins(
+      await notifyActiveAdmins(
         "Marketplace listing awaiting review",
         `“${item.title}” has been submitted for marketplace moderation.`,
         "/marketplace",
@@ -776,7 +776,7 @@ const submitBankTransferProof = async (req, res, next) => {
     item.paymentId = payment.id;
     await item.save();
 
-    notifyActiveAdmins("Bank transfer awaiting verification", `A bank transfer for “${item.title}” is awaiting verification.`, "/marketplace/bank-transfers", { paymentId: payment.id, marketplaceItemId: item.id }, { emailEvent: "bank_transfer" })
+    await notifyActiveAdmins("Bank transfer awaiting verification", `A bank transfer for “${item.title}” is awaiting verification.`, "/marketplace/bank-transfers", { paymentId: payment.id, marketplaceItemId: item.id }, { emailEvent: "bank_transfer" })
       .catch((error) => console.error("Failed to notify admins about bank transfer:", error.message));
     
     res.status(200).json({

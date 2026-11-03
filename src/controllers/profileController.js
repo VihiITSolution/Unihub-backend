@@ -171,7 +171,7 @@ const applyAsTutor = async (req, res, next) => {
       isProfileComplete: true,
     });
 
-    notifyActiveAdmins(
+    await notifyActiveAdmins(
       "Tutor application awaiting review",
       "A new tutor application has been submitted and is ready for review.",
       "/tutors/pending",

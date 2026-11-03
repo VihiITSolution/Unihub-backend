@@ -44,6 +44,8 @@ async function sendTestEmail(administrator) {
   );
 }
 
+// Callers await this so the email work is not abandoned when a deployed
+// request runtime finishes handling the originating action.
 async function notifyAdministrators({ event, title, message, link, sessionId }) {
   if (!EVENTS.has(event)) throw new Error(`Unknown live-session notification event: ${event}`);
 

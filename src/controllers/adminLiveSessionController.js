@@ -114,7 +114,7 @@ async function approve(req, res, next) {
     const emailSent = await notifyApprovalByEmail(result.tutorId, "liveSession", result.title);
     await provider.enqueue(result.id, "provision", null, "initial");
     await provider.notifySessionUsers(result.id, "Live session approved", `${result.title} was approved and is being prepared in Microsoft Teams.`);
-    notifyAdministrators({
+    await notifyAdministrators({
       event: "approval_updated",
       title: "Live session approved",
       message: `${result.title} was approved and Teams provisioning was queued.`,
@@ -135,7 +135,7 @@ async function reject(req, res, next) {
     await session.update({ approvalStatus: "rejected", rejectionReason: reason, approvedBy: req.user.id, approvedAt: new Date(), providerStatus: "not_provisioned" });
     await provider.event(session.id, req.user.id, "request.rejected", { reason });
     await provider.notifySessionUsers(session.id, "Live session request needs changes", `${session.title}: ${reason}`);
-    notifyAdministrators({
+    await notifyAdministrators({
       event: "approval_updated",
       title: "Live session request rejected",
       message: `${session.title} was returned to the tutor: ${reason}`,

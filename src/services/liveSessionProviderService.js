@@ -264,7 +264,7 @@ async function provision(sessionId) {
   } catch (error) {
     await meeting.update({ syncStatus: "failed", lastError: sanitize(error), lastSyncedAt: new Date() });
     await session.update({ providerStatus: "failed" });
-    notifyAdministrators({
+    await notifyAdministrators({
       event: "provisioning_failed",
       title: "Teams provisioning failed",
       message: `${session.title} could not be prepared in Microsoft Teams: ${sanitize(error)}`,

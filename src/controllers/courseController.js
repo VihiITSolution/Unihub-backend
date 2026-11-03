@@ -676,7 +676,7 @@ const submitForReview = async (req, res, next) => {
 
     await course.save();
 
-    notifyActiveAdmins(
+    await notifyActiveAdmins(
       "Course awaiting review",
       `“${course.title}” has been submitted for course moderation.`,
       "/courses/pending",

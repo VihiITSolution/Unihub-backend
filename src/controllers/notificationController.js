@@ -184,8 +184,10 @@ const createNotification = async (
 
 /**
  * Notify every active administrator about a new item in an operational queue.
- * This is deliberately best-effort; an unread-notification failure must never
- * prevent a student or vendor from completing their request.
+ * Callers must await this function: deployed request runtimes can terminate
+ * unawaited work after the response is sent. Individual delivery failures are
+ * contained below, so they still never prevent the original request from
+ * completing.
  */
 const notifyActiveAdmins = async (title, message, link = null, metadata = null, { emailEvent = null } = {}) => {
   if (emailEvent && !APPROVAL_EVENTS.includes(emailEvent)) throw new Error(`Unknown approval notification event: ${emailEvent}`);

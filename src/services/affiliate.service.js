@@ -10,9 +10,9 @@ const CAMPAIGN_TIERS = [{ through: 20, amount: 20 }, { through: 100, amount: 30 
 const MINIMUM_QUALIFYING_VIDEO_MINUTES = 20;
 
 function notifyReferralReviewAfterCommit(transaction, referral) {
-  transaction.afterCommit(() => {
+  transaction.afterCommit(async () => {
     const { notifyActiveAdmins } = require("../controllers/notificationController");
-    notifyActiveAdmins("Affiliate referral awaiting review", "An affiliate referral needs administrator review.", "/affiliate", { referralId: referral.id }, { emailEvent: "affiliate_referral" })
+    await notifyActiveAdmins("Affiliate referral awaiting review", "An affiliate referral needs administrator review.", "/affiliate", { referralId: referral.id }, { emailEvent: "affiliate_referral" })
       .catch((error) => console.error("Failed to notify admins about affiliate referral:", error.message));
   });
 }

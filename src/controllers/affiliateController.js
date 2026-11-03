@@ -30,7 +30,7 @@ async function requestRedemption(req, res, next) {
   try {
     if (!await ensureAffiliateAccount(req.user.id)) return res.status(403).json({ success: false, message: "A verified active profile is required to use the affiliate programme." });
     const request = await createPayoutRequest(req.user.id, Number(req.body.amount));
-    notifyActiveAdmins("Affiliate payout awaiting review", `An affiliate payout request for LKR ${request.amount} is awaiting review.`, "/affiliate", { payoutRequestId: request.id }, { emailEvent: "affiliate_payout" })
+    await notifyActiveAdmins("Affiliate payout awaiting review", `An affiliate payout request for LKR ${request.amount} is awaiting review.`, "/affiliate", { payoutRequestId: request.id }, { emailEvent: "affiliate_payout" })
       .catch((error) => console.error("Failed to notify admins about affiliate payout:", error.message));
     res.status(201).json({ success: true, message: "Redemption request submitted", data: { request: { id: request.id, amount: request.amount, status: request.status, accountMask: request.accountMask } } });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
