@@ -1,4 +1,5 @@
 const { Notification, User } = require("../models");
+const { sendEmail } = require("../services/resend.service");
 
 /**
  * Get user's notifications
@@ -185,19 +186,31 @@ const createNotification = async (
  * This is deliberately best-effort; an unread-notification failure must never
  * prevent a student or vendor from completing their request.
  */
-const notifyActiveAdmins = async (title, message, link = null, metadata = null) => {
+const notifyActiveAdmins = async (title, message, link = null, metadata = null, { email = false } = {}) => {
   const users = await User.findAll({
     where: { isActive: true },
-    attributes: ["id", "roles", "primaryRole"],
+    attributes: ["id", "firstName", "email", "roles", "primaryRole"],
   });
-  const adminIds = users
-    .filter((user) => user.primaryRole === "admin" || user.roles?.includes("admin"))
-    .map((user) => user.id);
+  const admins = users.filter((user) => user.primaryRole === "admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
 
-  await Promise.allSettled(
-    adminIds.map((userId) => createNotification(userId, "general", title, message, link, metadata)),
-  );
-  return adminIds.length;
+  const adminUrl = String(process.env.ADMIN_APP_URL || "https://unihub.lk/admin").replace(/\/+$/, "");
+  await Promise.all(admins.map(async (admin) => {
+    const tasks = [createNotification(admin.id, "general", title, message, link, metadata)];
+    if (email && admin.email) {
+      tasks.push(sendEmail(admin.email, `[UniHub] ${title}`, [
+        `Hi ${admin.firstName || "there"},`, "", message, "",
+        link ? `Review in UniHub Admin: ${adminUrl}/${link.replace(/^\/+/, "")}` : `Open UniHub Admin: ${adminUrl}`,
+      ].join("\n")));
+    }
+    const results = await Promise.allSettled(tasks);
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        const reason = result.reason?.response?.data?.message || result.reason?.message || "Unknown error";
+        console.error(`Failed to send administrator ${index === 0 ? "in-app notification" : "approval email"} to user ${admin.id}: ${reason}`);
+      }
+    });
+  }));
+  return admins.length;
 };
 
 module.exports = {

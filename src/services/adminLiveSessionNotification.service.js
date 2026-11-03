@@ -71,7 +71,7 @@ async function notifyAdministrators({ event, title, message, link, sessionId }) 
         `Hi ${administrator.firstName || "there"},`,
         "",
         message,
-        link ? `Open UniHub Admin: ${link}` : null,
+        link ? `Open UniHub Admin: ${String(process.env.ADMIN_APP_URL || "https://unihub.lk/admin").replace(/\/+$/, "")}/${link.replace(/^\/+/, "")}` : null,
         "",
         "You can change your live-session email notifications in UniHub Admin > Administrators.",
       ].filter(Boolean).join("\n"),

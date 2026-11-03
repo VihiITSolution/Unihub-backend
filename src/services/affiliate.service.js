@@ -9,6 +9,14 @@ const {
 const CAMPAIGN_TIERS = [{ through: 20, amount: 20 }, { through: 100, amount: 30 }, { through: null, amount: 40 }];
 const MINIMUM_QUALIFYING_VIDEO_MINUTES = 20;
 
+function notifyReferralReviewAfterCommit(transaction, referral) {
+  transaction.afterCommit(() => {
+    const { notifyActiveAdmins } = require("../controllers/notificationController");
+    notifyActiveAdmins("Affiliate referral awaiting review", "An affiliate referral needs administrator review.", "/affiliate", { referralId: referral.id }, { email: true })
+      .catch((error) => console.error("Failed to notify admins about affiliate referral:", error.message));
+  });
+}
+
 function payoutSecret() {
   if (!process.env.AFFILIATE_PAYOUT_ENCRYPTION_KEY) throw new Error("Affiliate payouts are not configured");
   return crypto.createHash("sha256").update(process.env.AFFILIATE_PAYOUT_ENCRYPTION_KEY).digest();
@@ -144,6 +152,7 @@ async function createReferralAttribution({ referralCode, referredUserId, transac
     await AffiliateRiskFlag.create({ referralId: referral.id, type: "referrer_velocity", details: { registrationsLast24Hours: count } }, { transaction });
     referral.status = "held";
     await referral.save({ transaction });
+    notifyReferralReviewAfterCommit(transaction, referral);
   }
   return referral;
 }
@@ -175,7 +184,7 @@ async function recordApprovedActivity(userId, activityType, activityResourceId) 
     const referral = await AffiliateReferral.findOne({ where: { referredUserId: userId, status: { [Op.in]: ["registered", "activity_detected", "review", "held"] } }, transaction, lock: transaction.LOCK.UPDATE });
     if (!referral || referral.activityType) return referral;
     referral.activityType = activityType; referral.activityResourceId = activityResourceId; referral.activityAt = new Date();
-    if (await hasOpenRisk(referral.id, transaction)) { referral.status = "held"; await referral.save({ transaction }); return referral; }
+    if (await hasOpenRisk(referral.id, transaction)) { referral.status = "held"; await referral.save({ transaction }); notifyReferralReviewAfterCommit(transaction, referral); return referral; }
     referral.status = "activity_detected"; await referral.save({ transaction });
     return approveReferral(referral.id, null, transaction);
   });
@@ -205,6 +214,7 @@ async function evaluateSocialActivity(userId) {
     referral.activityType = "social"; referral.activityResourceId = post.id; referral.socialPostId = post.id; referral.socialCommentId = comment.id; referral.activityAt = new Date();
     referral.status = await hasOpenRisk(referral.id, transaction) ? "held" : "review";
     await referral.save({ transaction });
+    notifyReferralReviewAfterCommit(transaction, referral);
     return referral;
   });
 }

@@ -170,6 +170,7 @@ const createListing = async (req, res, next) => {
         `“${item.title}” has been submitted for marketplace moderation.`,
         "/marketplace",
         { marketplaceItemId: item.id, sellerId: item.sellerId },
+        { email: true },
       ).catch((notificationError) => console.error("Failed to notify admins about marketplace listing:", notificationError.message));
     }
 
@@ -774,6 +775,9 @@ const submitBankTransferProof = async (req, res, next) => {
     // Link payment to item
     item.paymentId = payment.id;
     await item.save();
+
+    notifyActiveAdmins("Bank transfer awaiting verification", `A bank transfer for “${item.title}” is awaiting verification.`, "/marketplace/bank-transfers", { paymentId: payment.id, marketplaceItemId: item.id }, { email: true })
+      .catch((error) => console.error("Failed to notify admins about bank transfer:", error.message));
     
     res.status(200).json({
       success: true,

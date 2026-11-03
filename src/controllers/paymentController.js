@@ -4,6 +4,13 @@ const payhereService = require('../services/payhere.service');
 const helapayService = require('../services/helapay.service');
 const { calculateExpirationDate } = require('./marketplaceController');
 const { notifyApprovalByEmail } = require('../services/approvalEmail.service');
+const { notifyActiveAdmins } = require('./notificationController');
+
+function notifyMarketplaceReview(item) {
+  if (item.approvalStatus !== 'pending') return;
+  notifyActiveAdmins('Marketplace listing awaiting review', `“${item.title}” has been submitted for marketplace moderation.`, '/marketplace', { marketplaceItemId: item.id, sellerId: item.sellerId }, { email: true })
+    .catch((error) => console.error('Failed to notify admins about marketplace listing:', error.message));
+}
 
 // Replace uuid with crypto for generating unique IDs
 const uuidv4 = () => crypto.randomUUID();
@@ -327,11 +334,13 @@ const webhookPayHere = async (req, res) => {
     // If payment completed, update marketplace item
     if (paymentInfo.status === 'completed' && payment.marketplaceItem) {
       const item = payment.marketplaceItem;
+      const wasPaid = item.isPaid;
       item.isPaid = true;
       item.paidAt = new Date();
       item.expiresAt = calculateExpirationDate();
       // Keep approval status as pending for admin review
       await item.save();
+      if (!wasPaid) notifyMarketplaceReview(item);
     }
     
     console.log(`PayHere payment ${paymentInfo.status} for order ${paymentInfo.orderId}`);
@@ -391,11 +400,13 @@ const webhookHelaPay = async (req, res) => {
     // If payment completed, update marketplace item
     if (paymentInfo.status === 'completed' && payment.marketplaceItem) {
       const item = payment.marketplaceItem;
+      const wasPaid = item.isPaid;
       item.isPaid = true;
       item.paidAt = new Date();
       item.expiresAt = calculateExpirationDate();
       // Keep approval status as pending for admin review
       await item.save();
+      if (!wasPaid) notifyMarketplaceReview(item);
     }
     
     console.log(`HelaPay payment ${paymentInfo.status} for transaction ${paymentInfo.transactionId}`);
@@ -473,11 +484,13 @@ const verifyBankTransfer = async (req, res, next) => {
     // If approved, update marketplace item
     if (approved && payment.marketplaceItem) {
       const item = payment.marketplaceItem;
+      const wasPaid = item.isPaid;
       item.isPaid = true;
       item.paidAt = new Date();
       item.expiresAt = calculateExpirationDate();
       // Keep approval status as pending for admin review
       await item.save();
+      if (!wasPaid) notifyMarketplaceReview(item);
     }
 
     res.status(200).json({

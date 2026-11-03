@@ -176,6 +176,7 @@ const applyAsTutor = async (req, res, next) => {
       "A new tutor application has been submitted and is ready for review.",
       "/tutors/pending",
       { tutorProfileId: profile.id, applicantUserId: req.user.id },
+      { email: true },
     ).catch((notificationError) => console.error("Failed to notify admins about tutor application:", notificationError.message));
 
     res.status(201).json({
