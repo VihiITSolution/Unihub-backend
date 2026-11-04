@@ -23,7 +23,8 @@ const buildPrivacyEmbedUrl = (videoId) =>
 // Each chunk is written to uploads/chunks/{uploadId}/chunk-{index}
 const chunkStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(chunksBaseDir, req.body.uploadId || "unknown");
+    const safeId = (req.body.uploadId || "unknown").replace(/[^a-zA-Z0-9_-]/g, "");
+    const dir = path.join(chunksBaseDir, safeId || "unknown");
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -54,7 +55,8 @@ const receiveChunk = (req, res, next) => {
 
 /** POST /api/courses/:courseId/content/chunks/complete */
 const completeChunkedUpload = async (req, res, next) => {
-  const chunkDir = path.join(chunksBaseDir, req.body.uploadId || "");
+  const safeId = (req.body.uploadId || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  const chunkDir = path.join(chunksBaseDir, safeId);
 
   const cleanup = () => {
     try { fs.rmSync(chunkDir, { recursive: true, force: true }); } catch {}
