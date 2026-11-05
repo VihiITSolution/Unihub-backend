@@ -95,7 +95,9 @@ const completeChunkedUpload = async (req, res, next) => {
     }
 
     const n = parseInt(totalChunks, 10);
-    const ext = path.extname(fileName) || ".mp4";
+    // Sanitize extension to prevent path traversal via malicious fileName
+    const rawExt = path.extname(fileName) || ".mp4";
+    const ext = rawExt.replace(/[^a-zA-Z0-9.]/g, "");
     const assembledFilename = `video-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
     const assembledPath = path.join(videosDir, assembledFilename);
 
