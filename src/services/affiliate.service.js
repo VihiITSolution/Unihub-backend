@@ -178,7 +178,7 @@ async function approveReferral(referralId, adminId = null, transaction = null) {
   };
   return transaction ? execute(transaction) : sequelize.transaction(execute);
 }
-async function hasOpenRisk(referralId, transaction) { return AffiliateRiskFlag.count({ where: { referralId, status: "open" }, transaction }) > 0; }
+async function hasOpenRisk(referralId, transaction) { return (await AffiliateRiskFlag.count({ where: { referralId, status: "open" }, transaction })) > 0; }
 async function recordApprovedActivity(userId, activityType, activityResourceId, { occurredAt } = {}) {
   return sequelize.transaction(async (transaction) => {
     const referral = await AffiliateReferral.findOne({ where: { referredUserId: userId, status: { [Op.in]: ["registered", "activity_detected", "review", "held"] } }, transaction, lock: transaction.LOCK.UPDATE });
@@ -186,7 +186,7 @@ async function recordApprovedActivity(userId, activityType, activityResourceId, 
     const activityAt = occurredAt ? new Date(occurredAt) : new Date();
     if (!Number.isFinite(activityAt.getTime()) || activityAt < new Date(referral.createdAt)) return referral;
     referral.activityType = activityType; referral.activityResourceId = activityResourceId; referral.activityAt = activityAt;
-    if (await hasOpenRisk(referral.id, transaction)) { referral.status = "held"; await referral.save({ transaction }); notifyReferralReviewAfterCommit(transaction, referral); return referral; }
+    if (referral.status === "held" || await hasOpenRisk(referral.id, transaction)) { referral.status = "held"; await referral.save({ transaction }); notifyReferralReviewAfterCommit(transaction, referral); return referral; }
     referral.status = "activity_detected"; await referral.save({ transaction });
     return approveReferral(referral.id, null, transaction);
   });
