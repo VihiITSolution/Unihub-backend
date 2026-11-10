@@ -3,6 +3,7 @@ const { sequelize } = require('../models');
 const createAffiliateProgram = require('./create-affiliate-program');
 const addVendorAffiliateActivity = require('./add-vendor-affiliate-activity');
 const addLiveSessionAffiliateActivity = require('./add-live-session-affiliate-activity');
+const addManualAffiliateActivity = require('./add-manual-affiliate-activity');
 const extendAffiliateSignupDeadline = require('./extend-affiliate-signup-deadline');
 const { seedEligibleAffiliateAccounts } = require('../services/affiliate.service');
 
@@ -19,6 +20,7 @@ const migrate = async () => {
     await createAffiliateProgram(sequelize);
     await addVendorAffiliateActivity(sequelize);
     await addLiveSessionAffiliateActivity(sequelize);
+    await addManualAffiliateActivity(sequelize);
     await extendAffiliateSignupDeadline(sequelize);
     await seedEligibleAffiliateAccounts();
     console.log('✓ Affiliate programme migrated and eligible referral links seeded');

@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { sequelize, AffiliateReferral, AffiliateRiskFlag, AffiliatePayoutRequest, AffiliateLedgerEntry, User, StudentProfile, VendorProfile } = require("../models");
+const { sequelize, AffiliateReferral, AffiliateRiskFlag, AffiliatePayoutRequest, AffiliateLedgerEntry, AdminAuditLog, User, StudentProfile, VendorProfile } = require("../models");
 const { approveReferral, decryptDetails } = require("../services/affiliate.service");
 const { notifyApprovalByEmail } = require("../services/approvalEmail.service");
 
@@ -26,17 +26,29 @@ async function reviewReferral(req, res, next) {
   try {
     const action = req.body.action; const referral = await AffiliateReferral.findByPk(req.params.id);
     if (!referral) return res.status(404).json({ success: false, message: "Referral not found" });
-    if (action === "approve") {
+    if (action === "approve" || action === "approve_manual") {
+      const manual = action === "approve_manual";
+      const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
+      if (manual && (reason.length < 3 || reason.length > 500)) return res.status(400).json({ success: false, message: "Provide a reason between 3 and 500 characters for manual approval." });
       const approved = await sequelize.transaction(async (transaction) => {
         const locked = await AffiliateReferral.findByPk(referral.id, { transaction, lock: transaction.LOCK.UPDATE });
-        if (["available", "reversed"].includes(locked.status)) {
+        if (!locked || (manual ? !["registered", "activity_detected", "review", "held"].includes(locked.status) : ["available", "reversed"].includes(locked.status))) {
           const error = new Error("Referral cannot be approved in its current state"); error.statusCode = 409; throw error;
+        }
+        if (manual && locked.activityType) {
+          const error = new Error("This referral already has a recorded activity; use the normal Approve action."); error.statusCode = 409; throw error;
+        }
+        if (manual) {
+          locked.activityType = "manual";
+          locked.activityAt = new Date();
+          await locked.save({ transaction });
         }
         if (!locked.activityType) {
           const error = new Error("The referred user must complete a qualifying activity before this referral can be approved."); error.statusCode = 409; throw error;
         }
         const result = await approveReferral(locked.id, req.user.id, transaction);
         await AffiliateRiskFlag.update({ status: "cleared", resolvedBy: req.user.id, resolvedAt: new Date() }, { where: { referralId: locked.id, status: "open" }, transaction });
+        if (manual) await AdminAuditLog.create({ actorAdminId: req.user.id, action: "affiliate.referral_manually_approved", targetType: "affiliate_referral", targetId: String(locked.id), summary: "Manually approved a referral without recorded qualifying activity", metadata: { reason, rewardAmount: result.rewardAmount }, ipAddress: req.ip || null, userAgent: String(req.get("user-agent") || "").slice(0, 500) || null }, { transaction });
         return result;
       });
       const emailSent = await notifyApprovalByEmail(approved.referrerUserId, "affiliateReferral");

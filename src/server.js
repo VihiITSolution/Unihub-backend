@@ -13,6 +13,7 @@ const createCourseNotifyRequests = require("./migrations/create-course-notify-re
 const createAffiliateProgram = require("./migrations/create-affiliate-program");
 const addVendorAffiliateActivity = require("./migrations/add-vendor-affiliate-activity");
 const addLiveSessionAffiliateActivity = require("./migrations/add-live-session-affiliate-activity");
+const addManualAffiliateActivity = require("./migrations/add-manual-affiliate-activity");
 const extendAffiliateSignupDeadline = require("./migrations/extend-affiliate-signup-deadline");
 const { seedEligibleAffiliateAccounts } = require("./services/affiliate.service");
 const { startLiveSessionProviderWorker } = require("./workers/liveSessionProviderWorker");
@@ -210,6 +211,7 @@ const startServer = async () => {
     await createAffiliateProgram(sequelize);
     await addVendorAffiliateActivity(sequelize);
     await addLiveSessionAffiliateActivity(sequelize);
+    await addManualAffiliateActivity(sequelize);
     await extendAffiliateSignupDeadline(sequelize);
     await seedEligibleAffiliateAccounts();
 
