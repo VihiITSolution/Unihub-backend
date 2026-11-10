@@ -27,9 +27,18 @@ async function reviewReferral(req, res, next) {
     const action = req.body.action; const referral = await AffiliateReferral.findByPk(req.params.id);
     if (!referral) return res.status(404).json({ success: false, message: "Referral not found" });
     if (action === "approve") {
-      if (["available", "reversed"].includes(referral.status)) return res.status(409).json({ success: false, message: "Referral cannot be approved in its current state" });
-      await AffiliateRiskFlag.update({ status: "cleared", resolvedBy: req.user.id, resolvedAt: new Date() }, { where: { referralId: referral.id, status: "open" } });
-      const approved = await approveReferral(referral.id, req.user.id);
+      const approved = await sequelize.transaction(async (transaction) => {
+        const locked = await AffiliateReferral.findByPk(referral.id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (["available", "reversed"].includes(locked.status)) {
+          const error = new Error("Referral cannot be approved in its current state"); error.statusCode = 409; throw error;
+        }
+        if (!locked.activityType) {
+          const error = new Error("The referred user must complete a qualifying activity before this referral can be approved."); error.statusCode = 409; throw error;
+        }
+        const result = await approveReferral(locked.id, req.user.id, transaction);
+        await AffiliateRiskFlag.update({ status: "cleared", resolvedBy: req.user.id, resolvedAt: new Date() }, { where: { referralId: locked.id, status: "open" }, transaction });
+        return result;
+      });
       const emailSent = await notifyApprovalByEmail(approved.referrerUserId, "affiliateReferral");
       return res.json({ success: true, data: { referral: approved, emailSent } });
     }

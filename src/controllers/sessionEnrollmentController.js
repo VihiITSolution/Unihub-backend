@@ -4,6 +4,7 @@ const provider = require("../services/liveSessionProviderService");
 const { publicSession } = require("../utils/liveSessionPresentation");
 const { validateReferralCode } = require("../services/affiliate.service");
 const { validateLiveSessionReferralInvite, enrollReferralStudentInLiveSession } = require("../services/liveSessionReferral.service");
+const { recordApprovedActivity } = require("../services/affiliate.service");
 
 const isAdmin = (user) => user?.primaryRole === "admin" || user?.roles?.includes("admin");
 
@@ -152,6 +153,10 @@ async function joinSession(req, res, next) {
       });
     }
     await enrollment.update({ joinedAt: enrollment.joinedAt || new Date(), attended: true });
+    // UniHub tracks YouTube session attendance directly. Affiliate failures
+    // must not prevent the student from entering the live session.
+    try { await recordApprovedActivity(req.user.id, "live_session", session.id, { occurredAt: enrollment.joinedAt }); }
+    catch (error) { console.error("Failed to record live-session affiliate activity:", error.message); }
     res.json({
       success: true, message: "Joined live session",
       data: { provider: "youtube", launchMode: "embed", embedUrl: session.youtubeVideoId ? `https://www.youtube.com/embed/${session.youtubeVideoId}?autoplay=1` : null, chatUrl: session.enableChat && session.youtubeVideoId ? `https://www.youtube.com/live_chat?v=${session.youtubeVideoId}&embed_domain=${req.hostname}` : null, session: publicSession(session) },

@@ -2,6 +2,7 @@ require('dotenv').config();
 const { sequelize } = require('../models');
 const createAffiliateProgram = require('./create-affiliate-program');
 const addVendorAffiliateActivity = require('./add-vendor-affiliate-activity');
+const addLiveSessionAffiliateActivity = require('./add-live-session-affiliate-activity');
 const extendAffiliateSignupDeadline = require('./extend-affiliate-signup-deadline');
 const { seedEligibleAffiliateAccounts } = require('../services/affiliate.service');
 
@@ -17,6 +18,7 @@ const migrate = async () => {
     console.log('✓ All models synchronized successfully');
     await createAffiliateProgram(sequelize);
     await addVendorAffiliateActivity(sequelize);
+    await addLiveSessionAffiliateActivity(sequelize);
     await extendAffiliateSignupDeadline(sequelize);
     await seedEligibleAffiliateAccounts();
     console.log('✓ Affiliate programme migrated and eligible referral links seeded');
