@@ -140,7 +140,12 @@ async function joinSession(req, res, next) {
       }
       const meeting = await LiveSessionMeeting.findOne({ where: { sessionId: session.id } });
       if (!meeting?.joinUrl) return res.status(409).json({ success: false, message: "Teams join link is unavailable" });
-      await enrollment.update({ joinLaunchedAt: new Date() });
+      const joinLaunchedAt = new Date();
+      await enrollment.update({ joinLaunchedAt });
+      // Credit the authenticated, enrolled student's Join action; Teams
+      // attendance matching is not required for affiliate qualification.
+      try { await recordApprovedActivity(req.user.id, "live_session", session.id, { occurredAt: joinLaunchedAt }); }
+      catch (error) { console.error("Failed to record live-session affiliate activity:", error.message); }
       await provider.enqueue(session.id, "attendee_sync");
       return res.json({
         success: true, message: "Open Microsoft Teams to join",

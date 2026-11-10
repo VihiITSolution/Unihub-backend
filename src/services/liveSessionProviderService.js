@@ -1,7 +1,6 @@
 const { Op } = require("sequelize");
 const graph = require("./teamsGraphService");
 const { sendTeamsInvitationEmail } = require("./resend.service");
-const { recordApprovedActivity } = require("./affiliate.service");
 const { notifyAdministrators } = require("./adminLiveSessionNotification.service");
 const { downloadMicrosoftDriveItem } = require("./oneDriveImport.service");
 const {
@@ -349,13 +348,7 @@ async function syncArtifacts(sessionId) {
       attendanceDuration: Math.ceil(seconds / 60), attended: seconds > 0,
       attendanceSource: "teams", attendanceSyncStatus: "synced",
     });
-    if (seconds > 0) {
-      attendedCount += 1;
-      // A Teams join URL may be opened without the student actually entering
-      // the meeting. Only a matched, timed attendance interval qualifies.
-      const firstJoin = intervals.find((item) => Number(item.durationInSeconds) > 0 && item.joinDateTime)?.joinDateTime;
-      if (firstJoin) await recordApprovedActivity(studentId, "live_session", session.id, { occurredAt: firstJoin });
-    }
+    if (seconds > 0) attendedCount += 1;
   }
   await session.update({ totalAttendees: attendedCount });
 
