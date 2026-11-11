@@ -3,6 +3,7 @@ const graph = require("./teamsGraphService");
 const { sendTeamsInvitationEmail } = require("./resend.service");
 const { notifyAdministrators } = require("./adminLiveSessionNotification.service");
 const { downloadMicrosoftDriveItem } = require("./oneDriveImport.service");
+const { pickSessionRecording } = require("../utils/teamsRecordingMatch");
 const {
   sequelize, User, StudentProfile, TutorProfile, LiveSession, SessionEnrollment, Notification,
   MeetingOrganizerAccount, LiveSessionMeeting, UserMeetingIdentity,
@@ -354,8 +355,8 @@ async function syncArtifacts(sessionId) {
 
   const recordings = session.allowRecording ? await graph.listRecordings(organizerRef, meeting.teamsMeetingId) : [];
   if (recordings.length) {
-    const driveItems = await graph.searchOrganizerDrive(organizerRef, `UniHub #${session.id}`);
-    const item = driveItems.find((candidate) => candidate.file?.mimeType?.startsWith("video/")) || driveItems[0];
+    const candidates = await graph.findSessionRecordingCandidates(organizerRef, session.id);
+    const item = pickSessionRecording(candidates, session.id);
     if (item) {
       const enrollments = await SessionEnrollment.findAll({ where: { sessionId, paymentStatus: "completed" } });
       const enrolledIdentities = await UserMeetingIdentity.findAll({ where: { userId: { [Op.in]: enrollments.map((e) => e.studentId) }, provider: "teams", identityType: "student", invitationStatus: "accepted" } });

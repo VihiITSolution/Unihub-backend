@@ -280,6 +280,28 @@ async function searchOrganizerDrive(organizer, query) {
   return collectAll(`${userPath(organizer)}/drive/root/search(q='${literal}')`);
 }
 
+// Collect every drive item that could be this session's Teams recording. Teams
+// saves recordings to the organizer's "Recordings" folder, so list that first;
+// search is only a fallback because OneDrive's index lags new uploads and the
+// saved name uses "_" where the meeting subject had "#".
+async function findSessionRecordingCandidates(organizer, sessionId) {
+  const select = "$select=id,name,webUrl,file,folder,createdDateTime,size";
+  const lists = [];
+  try {
+    lists.push(await collectAll(`${userPath(organizer)}/drive/root:/Recordings:/children?${select}&$top=200`));
+  } catch (error) {
+    if (error.response?.status !== 404) throw error;
+  }
+  for (const query of [`UniHub _${sessionId}`, `UniHub #${sessionId}`]) {
+    try {
+      lists.push(await searchOrganizerDrive(organizer, query));
+    } catch (error) {
+      if (error.response?.status !== 404) throw error;
+    }
+  }
+  return lists.flat();
+}
+
 async function shareDriveItem(organizer, itemId, emails) {
   if (!emails.length) return;
   await request({
@@ -303,5 +325,5 @@ module.exports = {
   createOnlineMeeting, getOnlineMeeting,
   getCalendarEvent, updateCalendarMeeting, cancelCalendarMeeting, findOnlineMeeting,
   configureOnlineMeeting, listAttendanceReports, listRecordings, searchOrganizerDrive,
-  shareDriveItem, deleteDriveItem, getDriveQuota,
+  findSessionRecordingCandidates, shareDriveItem, deleteDriveItem, getDriveQuota,
 };
