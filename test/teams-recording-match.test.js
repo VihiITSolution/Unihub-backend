@@ -36,3 +36,33 @@ test("prefers the newest recording and de-duplicates folder + search results", (
   const newer = video("new", "[UniHub _30] Kotlin-2.mp4", "2026-11-11T06:00:00Z");
   assert.equal(pickSessionRecording([older, newer, older], 30)?.id, "new");
 });
+
+test("folder listing wins and a 403 from drive search does not break the lookup", async () => {
+  const axios = require("axios");
+  const graph = require("../src/services/teamsGraphService");
+  process.env.TEAMS_TENANT_ID = "t"; process.env.TEAMS_CLIENT_ID = "c"; process.env.TEAMS_CLIENT_SECRET = "s";
+  const originalAdapter = axios.defaults.adapter;
+  const calls = [];
+  const folder = [video("r28", "[UniHub _28] MADD Theory Discussion 2-20261110_153222UTC-Meeting Recording.mp4")];
+  axios.defaults.adapter = async (config) => {
+    const reply = (data, status = 200) => ({ data, status, statusText: "", headers: {}, config });
+    if (config.url.includes("login.microsoftonline.com")) return reply({ access_token: "tok", expires_in: 3600 });
+    calls.push(config.url);
+    if (config.url.includes("/search(")) {
+      const error = new Error("denied");
+      error.response = reply({ error: { code: "accessDenied" } }, 403);
+      throw error;
+    }
+    return reply({ value: folder });
+  };
+  try {
+    const found = await graph.findSessionRecordingCandidates("org", 28);
+    assert.equal(pickSessionRecording(found, 28)?.id, "r28");
+    assert.equal(calls.some((url) => url.includes("/search(")), false);
+    const none = await graph.findSessionRecordingCandidates("org", 31);
+    assert.equal(pickSessionRecording(none, 31), null);
+    assert.equal(calls.some((url) => url.includes("/search(")), true);
+  } finally {
+    axios.defaults.adapter = originalAdapter;
+  }
+});

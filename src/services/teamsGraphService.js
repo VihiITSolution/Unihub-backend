@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { pickSessionRecording } = require("../utils/teamsRecordingMatch");
 
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 let tokenCache = { value: null, expiresAt: 0 };
@@ -281,25 +282,28 @@ async function searchOrganizerDrive(organizer, query) {
 }
 
 // Collect every drive item that could be this session's Teams recording. Teams
-// saves recordings to the organizer's "Recordings" folder, so list that first;
-// search is only a fallback because OneDrive's index lags new uploads and the
-// saved name uses "_" where the meeting subject had "#".
+// saves recordings to the organizer's "Recordings" folder, so list that first.
+// Search is only a fallback: with app-only access Microsoft Graph often answers
+// drive search with 403 accessDenied even when Files.ReadWrite.All is granted,
+// and the saved name uses "_" where the meeting subject had "#". A failed
+// search must never hide a recording the folder listing already found.
 async function findSessionRecordingCandidates(organizer, sessionId) {
   const select = "$select=id,name,webUrl,file,folder,createdDateTime,size";
-  const lists = [];
+  let items = [];
   try {
-    lists.push(await collectAll(`${userPath(organizer)}/drive/root:/Recordings:/children?${select}&$top=200`));
+    items = await collectAll(`${userPath(organizer)}/drive/root:/Recordings:/children?${select}&$top=200`);
   } catch (error) {
     if (error.response?.status !== 404) throw error;
   }
+  if (pickSessionRecording(items, sessionId)) return items;
   for (const query of [`UniHub _${sessionId}`, `UniHub #${sessionId}`]) {
     try {
-      lists.push(await searchOrganizerDrive(organizer, query));
+      items = items.concat(await searchOrganizerDrive(organizer, query));
     } catch (error) {
-      if (error.response?.status !== 404) throw error;
+      if (![403, 404].includes(error.response?.status)) throw error;
     }
   }
-  return lists.flat();
+  return items;
 }
 
 async function shareDriveItem(organizer, itemId, emails) {
